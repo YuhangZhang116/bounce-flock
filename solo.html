@@ -1,0 +1,804 @@
+<!doctype html>
+<html lang="zh">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>弹弹追鸡 · 摇头特效版</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DotGothic16&family=Silkscreen:wght@400;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --ink:#1a1430; --line:#0b0817; --panel:#2b2250; --panel2:#382d66;
+  --cream:#fff2cf; --dim:#9a8fc4; --yolk:#ffd23f; --hawk:#ff5a3c; --mint:#53e3b7; --pink:#ff8fb3;
+  --f:"DotGothic16","Silkscreen","PingFang SC","Microsoft YaHei",monospace;
+  color-scheme:dark;
+}
+[hidden]{display:none!important}
+html,body{margin:0;height:100%;overflow:hidden;background:#0f0b1f;color:var(--cream);font-family:var(--f)}
+body{display:grid;place-items:center;touch-action:none;user-select:none;-webkit-user-select:none}
+#frame{position:relative;width:min(100vw,56.25vh);height:min(100vh,177.78vw);container-type:size;background:var(--ink);box-shadow:0 0 0 4px var(--line)}
+#out{position:absolute;inset:0;width:100%;height:100%;image-rendering:pixelated;display:block}
+.ov{position:absolute;inset:0;display:flex;flex-direction:column;justify-content:center;align-items:stretch;gap:3cqh;padding:6cqw;box-sizing:border-box;background:rgba(17,12,34,.72)}
+.ov.end{background:transparent;justify-content:flex-end;padding-bottom:5cqh}
+h1{margin:0;font-weight:400;font-size:14cqw;line-height:1.05;color:var(--yolk);text-shadow:0 .9cqw 0 var(--line),.7cqw 0 0 var(--hawk)}
+.sub{font-family:"Silkscreen",monospace;color:var(--mint);font-size:3.2cqw;letter-spacing:.25em;margin-top:1cqh}
+ol{margin:0;padding:0;list-style:none;display:flex;flex-direction:column;gap:1.6cqh}
+ol li{display:flex;gap:3cqw;align-items:center;font-size:4.2cqw;line-height:1.35;background:var(--line);padding:2cqw 3cqw}
+ol b{flex:0 0 auto;width:8cqw;height:8cqw;display:grid;place-items:center;background:var(--c);color:var(--line);font-weight:400}
+button{font:inherit;cursor:pointer;color:var(--cream);background:var(--panel2);border:.8cqw solid var(--line);box-shadow:inset 0 -1cqw 0 rgba(0,0,0,.28),0 .8cqw 0 var(--line);padding:2.6cqw 3cqw;font-size:4.6cqw}
+button:active{transform:translateY(.8cqw);box-shadow:inset 0 -.5cqw 0 rgba(0,0,0,.28)}
+button:focus-visible{outline:.8cqw solid var(--yolk);outline-offset:.6cqw}
+button.big{background:var(--yolk);color:var(--line);font-size:6cqw}
+button[disabled]{opacity:.5;cursor:wait}
+.row{display:flex;gap:3cqw}.row>*{flex:1}
+label.rec{display:flex;align-items:center;gap:2cqw;font-size:3.8cqw;color:var(--cream)}
+label.rec input{width:5cqw;height:5cqw;accent-color:var(--hawk)}
+.note{font-size:3.2cqw;color:var(--dim);line-height:1.5;margin:0}
+.err{color:var(--hawk)}
+#recBadge{position:absolute;bottom:4.5cqh;right:3cqw;font-family:"Silkscreen",monospace;font-size:3.2cqw;background:var(--hawk);color:var(--line);padding:.6cqw 1.6cqw;animation:blink 1s steps(2) infinite}
+@keyframes blink{50%{opacity:.35}}
+#help{position:absolute;bottom:1.2cqh;left:0;right:0;text-align:center;font-size:2.8cqw;color:var(--dim);pointer-events:none}
+@media (prefers-reduced-motion:reduce){#recBadge{animation:none}}
+</style>
+</head>
+<body>
+<div id="frame">
+  <canvas id="out" aria-label="游戏画面"></canvas>
+
+  <div class="ov" id="menu">
+    <div><h1>弹弹追鸡</h1><div class="sub">FACE FX · 30 SEC</div></div>
+    <ol>
+      <li><b style="--c:var(--yolk)">1</b>转动脑袋，小鸡跟着你跑</li>
+      <li><b style="--c:var(--pink)">2</b>张大嘴，小鸡跳起来躲老鹰</li>
+      <li><b style="--c:var(--hawk)">3</b>地上出现红圈就快跑，30 秒内吃金蛋</li>
+    </ol>
+    <button class="big" id="camBtn" type="button">打开摄像头开始</button>
+    <div class="row">
+      <button id="mouseBtn" type="button">用鼠标试玩</button>
+      <label class="rec"><input type="checkbox" id="recChk" checked>录下这一局</label>
+    </div>
+    <p class="note" id="note">画面只在你这台电脑上识别，不会上传。按 M 可以慢放动效。</p>
+  </div>
+
+  <div class="ov end" id="endOv" hidden>
+    <div class="row">
+      <button class="big" id="againBtn" type="button">再来一局</button>
+      <button id="saveBtn" type="button" hidden>保存视频</button>
+    </div>
+    <button id="homeBtn" type="button">回到开始</button>
+  </div>
+
+  <div id="recBadge" hidden>● REC</div>
+  <div id="help" hidden>M 慢放 · 空格也能跳</div>
+</div>
+
+<script type="module">
+import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js';
+const MP = 'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14';
+const FACE_MODEL = 'https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task';
+
+/* =====================================================================
+   动效规范 MOTION SPEC —— 所有时长/力度集中在这里，方便调参和做拆解页
+   ===================================================================== */
+const MOTION = {
+  hopVelocity:   9.5,   // 张嘴起跳初速度
+  gravity:       30,    // 重力：决定滞空约 0.63s
+  takeoffStretch:-.55,  // 起跳瞬间拉长
+  landSquash:    .55,   // 落地压扁
+  squashSpring:  190,   // 形变回弹刚度（越大越快）
+  squashDamp:    11,    // 形变阻尼（越小越抖）
+  aimTime:       .95,   // 老鹰锁定预警时长（红圈收缩）
+  aimTrack:      .55,   // 预警前 55% 时间内红圈会跟随小鸡
+  diveTime:      .26,   // 俯冲时长（ease-in 加速）
+  riseTime:      .8,    // 回升时长（ease-out）
+  hitRadius:     1.35,  // 俯冲命中半径
+  nearRadius:    2.4,   // 「好险」判定半径
+  hitSlowmo:     .45,   // 被啄中慢动作时长
+  slowScale:     .22,   // 慢动作倍率
+  hitShake:      .8,    // 被啄中震屏强度
+  impactShake:   .28,   // 俯冲落地震屏
+  punchFov:      7,     // 被啄中镜头推近（度）
+  calloutIn:     .18,   // 大字弹出
+  calloutHold:   .55,
+  popupRise:     70,    // 加分数字上飘（像素）
+  cardIn:        .6,    // 结果卡滑入（ease-out-back）
+  scoreCount:    .9,    // 结果分数滚动
+};
+const GAME = { dur:30, hearts:3, eggPts:10, dodgePts:5, nearPts:3, heartBonus:30, hawkAt:[0, 8, 18] };
+
+const $ = s => document.querySelector(s);
+const clamp = (v,a,b) => Math.max(a, Math.min(b, v));
+const lerp = (a,b,t) => a + (b-a)*t;
+const rnd = (a,b) => a + Math.random()*(b-a);
+const len = (x,z) => Math.hypot(x,z);
+const easeOutBack = t => { const c1 = 1.70158, c3 = c1+1; return 1 + c3*Math.pow(t-1,3) + c1*Math.pow(t-1,2); };
+const easeInCubic = t => t*t*t;
+const easeOutCubic = t => 1 - Math.pow(1-t, 3);
+
+/* ---------------- output canvas (9:16, composited, recordable) ---------------- */
+const OW = 540, OH = 960, SC = 3, LW = OW/SC, LH = OH/SC;
+const out = $('#out'); out.width = OW; out.height = OH;
+const ctx = out.getContext('2d');
+
+/* ---------------- three.js low-res pixel render ---------------- */
+const renderer = new THREE.WebGLRenderer({ antialias:false, preserveDrawingBuffer:true });
+renderer.setPixelRatio(1); renderer.setSize(LW, LH, false);
+const glc = renderer.domElement;
+const scene = new THREE.Scene(); scene.background = new THREE.Color(0x140f26);
+const camera = new THREE.PerspectiveCamera(55, LW/LH, .1, 100);
+const CAM_BASE = new THREE.Vector3(0, 17.5, 11.5);
+
+const HW = 5, HL = 7;
+const GRAD = (() => { const t = new THREE.DataTexture(new Uint8Array([70,150,255]), 3, 1, THREE.RedFormat); t.minFilter = t.magFilter = THREE.NearestFilter; t.needsUpdate = true; return t; })();
+const toon = (c, x={}) => new THREE.MeshToonMaterial({ color:c, gradientMap:GRAD, ...x });
+const OUT = new THREE.MeshBasicMaterial({ color:0x0b0817, side:THREE.BackSide });
+scene.add(new THREE.HemisphereLight(0xc9c0ff, 0x2a1d4a, .95));
+const sun = new THREE.DirectionalLight(0xfff0d0, 1.6); sun.position.set(-6, 18, 9); scene.add(sun);
+function ctex(w, h, draw){ const c = document.createElement('canvas'); c.width = w; c.height = h; draw(c.getContext('2d'), w, h); const t = new THREE.CanvasTexture(c); t.magFilter = t.minFilter = THREE.NearestFilter; t.colorSpace = THREE.SRGBColorSpace; return t; }
+
+// floor
+const floorTex = ctex(HW*8, HL*8, (g,w,h) => {
+  for (let y=0;y<h;y+=4) for (let x=0;x<w;x+=4) { g.fillStyle = ((x+y)/4)%2 ? '#2e2560' : '#352a6e'; g.fillRect(x,y,4,4); }
+  g.strokeStyle = '#53e3b7'; g.strokeRect(2.5,2.5,w-5,h-5);
+  g.fillStyle = 'rgba(255,210,63,.18)'; g.fillRect(w/2-8, h/2-8, 16, 16);
+  g.fillStyle = '#ff8fb3'; for (let i=0;i<5;i++) g.fillRect(w/2-1, 8+i*8, 2, 4);
+});
+const floor = new THREE.Mesh(new THREE.PlaneGeometry(HW*2, HL*2), toon(0xffffff, { map:floorTex }));
+floor.rotation.x = -Math.PI/2; scene.add(floor);
+const under = new THREE.Mesh(new THREE.PlaneGeometry(80,80), new THREE.MeshBasicMaterial({ color:0x0f0b1f })); under.rotation.x = -Math.PI/2; under.position.y = -.02; scene.add(under);
+const brick = ctex(16, 8, g => { g.fillStyle='#ff8fb3'; g.fillRect(0,0,16,8); g.fillStyle='#d9628f'; g.fillRect(0,3,16,1); g.fillRect(0,7,16,1); g.fillRect(7,0,1,3); g.fillRect(3,4,1,3); g.fillRect(11,4,1,3); });
+function wall(w, d, x, z){ const t = brick.clone(); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(Math.max(w,d)/1.4, 1); t.needsUpdate = true;
+  const m = new THREE.Mesh(new THREE.BoxGeometry(w, 1.2, d), toon(0xffffff, { map:t })); m.position.set(x, .6, z); scene.add(m); }
+wall(HW*2+2, 1, 0, -HL-.5); wall(HW*2+2, 1, 0, HL+.5); wall(1, HL*2, -HW-.5, 0); wall(1, HL*2, HW+.5, 0);
+
+// bumpers
+const BUMPERS = [[-2.6,-2.8],[2.6,-2.8],[0,1.8]].map(([x,z],i) => ({ x, z, r:.85, flash:0, i }));
+const BCOL = [0xff8fb3, 0x53e3b7, 0xffd23f];
+const bumperMeshes = BUMPERS.map((b,i) => {
+  const g = new THREE.Group();
+  const base = new THREE.Mesh(new THREE.CylinderGeometry(b.r, b.r*1.08, .35, 10), toon(0x2b2250)); base.position.y = .17;
+  const capMat = toon(BCOL[i], { emissive:BCOL[i], emissiveIntensity:0 });
+  const cap = new THREE.Mesh(new THREE.CylinderGeometry(b.r*.85, b.r*.85, .45, 10), capMat); cap.position.y = .55;
+  const o = new THREE.Mesh(cap.geometry, OUT); o.scale.setScalar(1.1); cap.add(o);
+  const top = new THREE.Mesh(new THREE.CylinderGeometry(b.r*.4, b.r*.4, .16, 10), toon(0xfff2cf)); top.position.y = .85;
+  g.add(base, cap, top); g.position.set(b.x, 0, b.z); scene.add(g);
+  return { cap, capMat };
+});
+
+// particles
+const PMAX = 260;
+const pMesh = new THREE.InstancedMesh(new THREE.BoxGeometry(.16,.16,.16), new THREE.MeshBasicMaterial({ color:0xffffff }), PMAX);
+pMesh.frustumCulled = false; scene.add(pMesh);
+const parts = Array.from({length:PMAX}, () => ({ life:0 }));
+for (let i=0;i<PMAX;i++) pMesh.setColorAt(i, new THREE.Color(1,1,1));
+let pNext = 0;
+const _m = new THREE.Matrix4(), _q = new THREE.Quaternion(), _s = new THREE.Vector3(), _p = new THREE.Vector3(), _c = new THREE.Color();
+function burst(x, y, z, n, colors, spd=5, life=.6, grav=14, size=1){
+  for (let k=0;k<n;k++) {
+    const i = pNext, p = parts[i]; pNext = (pNext+1) % PMAX;
+    const a = Math.random()*Math.PI*2, u = .4 + Math.random();
+    Object.assign(p, { x, y, z, vx:Math.cos(a)*spd*u, vz:Math.sin(a)*spd*u, vy:rnd(.3,1)*spd, life:life*rnd(.6,1.2), g:grav, s:size*rnd(.7,1.3) });
+    p.max = p.life;
+    pMesh.setColorAt(i, _c.set(Array.isArray(colors) ? colors[k % colors.length] : colors));
+  }
+  pMesh.instanceColor.needsUpdate = true;
+}
+function stepParts(dt){
+  for (let i=0;i<PMAX;i++) {
+    const p = parts[i];
+    if (p.life > 0) {
+      p.life -= dt; p.vy -= p.g*dt; p.x += p.vx*dt; p.y += p.vy*dt; p.z += p.vz*dt;
+      if (p.y < .08) { p.y = .08; p.vy *= -.4; p.vx *= .7; p.vz *= .7; }
+      const s = p.s * Math.max(0, p.life/p.max);
+      _m.compose(_p.set(p.x,p.y,p.z), _q, _s.set(s,s,s));
+    } else _m.compose(_p.set(0,-50,0), _q, _s.set(0,0,0));
+    pMesh.setMatrixAt(i, _m);
+  }
+  pMesh.instanceMatrix.needsUpdate = true;
+}
+
+/* ---------------- face texture (your face on the chick) ---------------- */
+const FPX = 24;
+const faceC = document.createElement('canvas'); faceC.width = faceC.height = FPX;
+const fctx = faceC.getContext('2d', { willReadFrequently:true });
+const tmpC = document.createElement('canvas'); tmpC.width = tmpC.height = 96;
+const tctx = tmpC.getContext('2d');
+const faceTex = new THREE.CanvasTexture(faceC); faceTex.magFilter = faceTex.minFilter = THREE.NearestFilter; faceTex.colorSpace = THREE.SRGBColorSpace;
+const snapC = document.createElement('canvas'); snapC.width = snapC.height = FPX; // funniest face (widest mouth)
+function circleMaskAndQuantize(){
+  const img = fctx.getImageData(0,0,FPX,FPX), d = img.data, c = (FPX-1)/2;
+  for (let y=0;y<FPX;y++) for (let x=0;x<FPX;x++) {
+    const i = (y*FPX+x)*4, r = Math.hypot(x-c, y-c);
+    if (r > c+.4) { d[i+3] = 0; continue; }
+    if (r > c-.8) { d[i]=11; d[i+1]=8; d[i+2]=23; d[i+3]=255; continue; }
+    for (let k=0;k<3;k++) { let v = d[i+k]/255; v = clamp((v-.5)*1.25+.54, 0, 1); d[i+k] = Math.round(v*5)/5*255; }
+    d[i] = Math.min(255, d[i]+10); d[i+3] = 255;
+  }
+  fctx.putImageData(img, 0, 0);
+}
+function drawDefaultFace(){
+  fctx.clearRect(0,0,FPX,FPX);
+  fctx.fillStyle = '#ffd23f'; fctx.beginPath(); fctx.arc(FPX/2, FPX/2, FPX/2, 0, 7); fctx.fill();
+  fctx.fillStyle = '#0b0817'; fctx.fillRect(7,9,2,4); fctx.fillRect(15,9,2,4);
+  fctx.fillStyle = '#ff9a2e'; fctx.fillRect(10,14,4,2); fctx.fillRect(11,16,2,1);
+  fctx.fillStyle = '#ff8fb3'; fctx.fillRect(4,14,3,2); fctx.fillRect(17,14,3,2);
+  circleMaskAndQuantize(); faceTex.needsUpdate = true;
+  snapC.getContext('2d').clearRect(0,0,FPX,FPX); snapC.getContext('2d').drawImage(faceC, 0, 0);
+}
+drawDefaultFace();
+
+/* ---------------- chick ---------------- */
+function buildChick(){
+  const root = new THREE.Group(), body = new THREE.Group(); root.add(body);
+  const r = .8, sg = new THREE.SphereGeometry(r, 10, 7);
+  const bodyMat = toon(0xffd23f);
+  const b = new THREE.Mesh(sg, bodyMat), o = new THREE.Mesh(sg, OUT); o.scale.setScalar(1.1); body.add(o, b); body.position.y = r;
+  const wings = [];
+  for (const s of [-1,1]) { const pv = new THREE.Group(); pv.position.set(s*r*.86, 0, 0);
+    const w = new THREE.Mesh(new THREE.BoxGeometry(r*.18, r*.5, r*.8), toon(0xffb21f)); w.position.x = s*r*.1;
+    const wo = new THREE.Mesh(w.geometry, OUT); wo.scale.setScalar(1.25); w.add(wo); pv.add(w); body.add(pv); wings.push(pv); }
+  const tuft = new THREE.Mesh(new THREE.ConeGeometry(r*.16, r*.45, 4), toon(0xffb21f)); tuft.position.set(0, r*1.05, 0); tuft.rotation.z = .3; body.add(tuft);
+  const face = new THREE.Sprite(new THREE.SpriteMaterial({ map:faceTex, transparent:true })); face.scale.set(1.25, 1.25, 1); face.position.set(0, r*.15, r*.75); face.renderOrder = 2; body.add(face);
+  const shadow = new THREE.Mesh(new THREE.CircleGeometry(r, 10), new THREE.MeshBasicMaterial({ color:0, transparent:true, opacity:.35, depthWrite:false })); shadow.rotation.x = -Math.PI/2; shadow.position.y = .02; root.add(shadow);
+  const shield = new THREE.Mesh(new THREE.SphereGeometry(r*1.5, 8, 6), new THREE.MeshBasicMaterial({ color:0x53e3b7, wireframe:true, transparent:true, opacity:.75 })); shield.position.y = r; shield.visible = false; root.add(shield);
+  scene.add(root);
+  return { root, body, bodyMat, wings, shadow, shield, face };
+}
+const ch = { x:0, z:2, y:0, vx:0, vz:0, vy:0, air:false, hopCd:0, inv:0, shield:0, knock:0, sq:0, sqv:0, mesh:buildChick() };
+
+/* ---------------- hawks ---------------- */
+function buildHawk(){
+  const root = new THREE.Group(), body = new THREE.Group(); root.add(body);
+  const r = .75, sg = new THREE.SphereGeometry(r, 10, 7);
+  body.add(new THREE.Mesh(sg, toon(0x8e5530))); const o = new THREE.Mesh(sg, OUT); o.scale.setScalar(1.1); body.add(o);
+  const cap = new THREE.Mesh(new THREE.SphereGeometry(r*.8, 10, 6, 0, Math.PI*2, 0, Math.PI*.45), toon(0xfff2cf)); cap.position.set(0, r*.3, r*.2); body.add(cap);
+  const beak = new THREE.Mesh(new THREE.ConeGeometry(r*.24, r*.6, 4), toon(0xffc23d)); beak.rotation.x = Math.PI/2; beak.position.set(0, 0, r*1.05); body.add(beak);
+  for (const s of [-1,1]) { const brow = new THREE.Mesh(new THREE.BoxGeometry(r*.4, r*.1, r*.1), toon(0x0b0817)); brow.position.set(s*r*.34, r*.5, r*.88); brow.rotation.z = s*.45; body.add(brow); }
+  const wings = [];
+  for (const s of [-1,1]) { const pv = new THREE.Group(); pv.position.set(s*r*.8, r*.1, 0);
+    const w = new THREE.Mesh(new THREE.BoxGeometry(r*1.9, r*.14, r*.9), toon(0x5b3420)); w.position.x = s*r*.95;
+    const wo = new THREE.Mesh(w.geometry, OUT); wo.scale.set(1.06, 1.6, 1.15); w.add(wo); pv.add(w); body.add(pv); wings.push(pv); }
+  const shadow = new THREE.Mesh(new THREE.CircleGeometry(.9, 10), new THREE.MeshBasicMaterial({ color:0, transparent:true, opacity:.35, depthWrite:false })); shadow.rotation.x = -Math.PI/2; shadow.position.y = .03;
+  const ret = new THREE.Group();
+  const rr = new THREE.Mesh(new THREE.RingGeometry(1.15, 1.4, 20), new THREE.MeshBasicMaterial({ color:0xff5a3c, transparent:true, depthWrite:false, side:THREE.DoubleSide }));
+  const rd = new THREE.Mesh(new THREE.CircleGeometry(1.15, 20), new THREE.MeshBasicMaterial({ color:0xff5a3c, transparent:true, opacity:.18, depthWrite:false }));
+  rr.rotation.x = rd.rotation.x = -Math.PI/2; rr.position.y = .05; rd.position.y = .04; ret.add(rr, rd); ret.visible = false;
+  const wave = new THREE.Mesh(new THREE.RingGeometry(.85, 1, 24), new THREE.MeshBasicMaterial({ color:0xfff2cf, transparent:true, depthWrite:false, side:THREE.DoubleSide }));
+  wave.rotation.x = -Math.PI/2; wave.position.y = .06; wave.visible = false;
+  scene.add(root, shadow, ret, wave);
+  return { root, body, wings, shadow, ret, rr, wave };
+}
+const hawks = [0,1,2].map(i => ({ i, active:false, state:'circle', t:0, ang:i*2.1, x:0, y:6.5, z:0, tx:0, tz:0, sx:0, sz:0, sy:6.5, waveT:-1, mesh:buildHawk() }));
+
+/* ---------------- pickups ---------------- */
+const eggGeo = new THREE.SphereGeometry(.38, 8, 6);
+const eggs = [0,1,2].map(() => { const m = new THREE.Mesh(eggGeo, toon(0xffe27a, { emissive:0xffb21f, emissiveIntensity:.25 })); m.scale.y = 1.3; const o = new THREE.Mesh(eggGeo, OUT); o.scale.setScalar(1.15); m.add(o); scene.add(m); return { m, alive:false, t:rnd(.2,1.2), x:0, z:0 }; });
+const ringM = (() => { const t = new THREE.Mesh(new THREE.TorusGeometry(.75, .16, 6, 14), toon(0x53e3b7, { emissive:0x53e3b7, emissiveIntensity:.4 })); const o = new THREE.Mesh(t.geometry, OUT); o.scale.setScalar(1.1); t.add(o); scene.add(t); return t; })();
+const ring = { alive:false, t:5, x:0, z:0 };
+function freeSpot(minChick=2.5){
+  for (let k=0;k<40;k++) {
+    const x = rnd(-HW+1, HW-1), z = rnd(-HL+1, HL-1);
+    if (BUMPERS.some(b => len(b.x-x, b.z-z) < 1.8)) continue;
+    if (len(ch.x-x, ch.z-z) < minChick) continue;
+    if (eggs.some(e => e.alive && len(e.x-x, e.z-z) < 1.6)) continue;
+    return [x, z];
+  }
+  return [rnd(-HW+1, HW-1), rnd(-HL+1, HL-1)];
+}
+
+/* ---------------- audio (also routed into the recording) ---------------- */
+let AC = null, master = null, recDest = null, muted = false, lastBeat = 0;
+function ensureAudio(){
+  if (!AC) { try { AC = new (window.AudioContext || window.webkitAudioContext)(); master = AC.createGain(); master.gain.value = .9; master.connect(AC.destination); recDest = AC.createMediaStreamDestination(); master.connect(recDest); } catch {} }
+  if (AC && AC.state === 'suspended') AC.resume();
+}
+function tone(f, d=.1, type='square', f2=null, vol=.08, delay=0){
+  if (!AC || muted) return;
+  const t = AC.currentTime + delay, o = AC.createOscillator(), g = AC.createGain();
+  o.type = type; o.frequency.setValueAtTime(f, t); if (f2) o.frequency.exponentialRampToValueAtTime(f2, t+d);
+  g.gain.setValueAtTime(vol, t); g.gain.exponentialRampToValueAtTime(.0001, t+d);
+  o.connect(g).connect(master); o.start(t); o.stop(t+d+.02);
+}
+function noise(d=.15, vol=.12){
+  if (!AC || muted) return;
+  const n = Math.floor(AC.sampleRate*d), buf = AC.createBuffer(1, n, AC.sampleRate), c = buf.getChannelData(0);
+  for (let i=0;i<n;i++) c[i] = (Math.random()*2-1)*(1-i/n);
+  const s = AC.createBufferSource(), g = AC.createGain(); g.gain.value = vol; s.buffer = buf; s.connect(g).connect(master); s.start();
+}
+const SFX = {
+  hop(){ tone(420,.12,'square',980,.07); },
+  land(){ tone(160,.06,'triangle',90,.05); },
+  bump(){ tone(520,.09,'square',1000,.07); },
+  egg(n){ const b = 660*Math.pow(1.122, Math.min(n-1, 8)); tone(b,.07,'square',null,.07); tone(b*1.5,.09,'square',null,.06,.06); },
+  aim(){ tone(880,.08,'square',null,.05); tone(880,.08,'square',null,.05,.14); },
+  dive(){ noise(.18,.08); tone(1200,.22,'sawtooth',180,.05); },
+  impact(){ tone(110,.2,'square',50,.12); noise(.12,.1); },
+  hit(){ noise(.3,.18); tone(700,.08,'square',null,.1); tone(440,.16,'square',null,.1,.08); },
+  dodge(){ [784,988,1319].forEach((f,i) => tone(f,.07,'square',null,.07,i*.05)); },
+  near(){ tone(600,.1,'triangle',900,.06); },
+  shield(){ tone(1200,.18,'triangle',400,.08); },
+  ring(){ [660,880,1320].forEach((f,i) => tone(f,.08,'square',null,.06,i*.06)); },
+  count(){ tone(440,.12,'square',null,.08); },
+  go(){ tone(880,.3,'square',null,.09); },
+  end(){ [523,659,784,1046].forEach((f,i) => tone(f,.16,'square',null,.08,i*.12)); },
+  lose(){ [523,392,330,262].forEach((f,i) => tone(f,.18,'square',null,.08,i*.13)); },
+  beat(){ tone(70,.12,'sine',45,.2); },
+};
+
+/* ---------------- face tracking (MediaPipe Face Landmarker) ---------------- */
+const face = { on:false, ok:false, nx:.5, ny:.5, cx:.5, cy:.5, jaw:0, armed:true, maxJaw:0, lostT:0 };
+const video = document.createElement('video'); video.playsInline = true; video.muted = true;
+let landmarker = null, lastVT = -1, cropTick = 0;
+const prevC = document.createElement('canvas'); prevC.width = 36; prevC.height = 48; const pctx = prevC.getContext('2d');
+async function startCamera(){
+  const stream = await navigator.mediaDevices.getUserMedia({ video:{ facingMode:'user', width:{ ideal:640 }, height:{ ideal:480 } }, audio:false });
+  video.srcObject = stream; await video.play();
+  const { FaceLandmarker, FilesetResolver } = await import(`${MP}/vision_bundle.mjs`);
+  const fileset = await FilesetResolver.forVisionTasks(`${MP}/wasm`);
+  const opts = d => ({ baseOptions:{ modelAssetPath:FACE_MODEL, delegate:d }, outputFaceBlendshapes:true, runningMode:'VIDEO', numFaces:1 });
+  try { landmarker = await FaceLandmarker.createFromOptions(fileset, opts('GPU')); }
+  catch { landmarker = await FaceLandmarker.createFromOptions(fileset, opts('CPU')); }
+  face.on = true;
+}
+function pollFace(now){
+  if (!landmarker || video.readyState < 2 || video.currentTime === lastVT) return;
+  lastVT = video.currentTime;
+  const r = landmarker.detectForVideo(video, now);
+  const L = r.faceLandmarks && r.faceLandmarks[0];
+  if (!L) { face.ok = false; return; }
+  face.ok = true;
+  face.nx = lerp(face.nx, L[1].x, .55); face.ny = lerp(face.ny, L[1].y, .55);
+  const cat = r.faceBlendshapes?.[0]?.categories || [];
+  const jaw = cat.find(c => c.categoryName === 'jawOpen')?.score ?? 0;
+  face.jaw = lerp(face.jaw, jaw, .6);
+  if (++cropTick % 2 === 0 || jaw > face.maxJaw) cropFace(L);
+  if (G.phase === 'play' && jaw > face.maxJaw) { face.maxJaw = jaw; const s = snapC.getContext('2d'); s.clearRect(0,0,FPX,FPX); s.drawImage(faceC, 0, 0); }
+}
+function cropFace(L){
+  const vw = video.videoWidth, vh = video.videoHeight;
+  let x0 = 1, x1 = 0, y0 = 1, y1 = 0;
+  for (const i of [10,152,234,454,127,356,148,377,67,297]) { const p = L[i]; x0 = Math.min(x0,p.x); x1 = Math.max(x1,p.x); y0 = Math.min(y0,p.y); y1 = Math.max(y1,p.y); }
+  const cx = (x0+x1)/2*vw, cy = (y0+y1)/2*vh, size = Math.max((x1-x0)*vw, (y1-y0)*vh)*1.12;
+  tctx.save(); tctx.clearRect(0,0,96,96); tctx.translate(96,0); tctx.scale(-1,1);
+  tctx.drawImage(video, cx-size/2, cy-size/2, size, size, 0, 0, 96, 96); tctx.restore();
+  fctx.clearRect(0,0,FPX,FPX); fctx.imageSmoothingEnabled = true; fctx.drawImage(tmpC, 0, 0, FPX, FPX);
+  circleMaskAndQuantize(); faceTex.needsUpdate = true;
+}
+
+/* ---------------- input → target on the board ---------------- */
+const keys = new Set();
+let pointerT = null, hopReq = false;
+const ray = new THREE.Raycaster(), plane = new THREE.Plane(new THREE.Vector3(0,1,0), 0), hitP = new THREE.Vector3();
+addEventListener('keydown', e => {
+  keys.add(e.code);
+  if (e.code === 'Space') { hopReq = true; e.preventDefault(); }
+  if (e.code === 'KeyM') timeScale = timeScale === 1 ? .25 : 1;
+});
+addEventListener('keyup', e => keys.delete(e.code));
+out.addEventListener('pointermove', e => setPointer(e));
+out.addEventListener('pointerdown', e => { setPointer(e); if (!face.on || e.button === 0) hopReq = true; });
+function setPointer(e){
+  if (face.on) return;
+  const r = out.getBoundingClientRect();
+  ray.setFromCamera({ x:(e.clientX-r.left)/r.width*2-1, y:-((e.clientY-r.top)/r.height*2-1) }, camera);
+  if (ray.ray.intersectPlane(plane, hitP)) pointerT = [hitP.x, hitP.z];
+}
+function targetPos(){
+  if (face.on) {
+    if (!face.ok) return [ch.x, ch.z];
+    const dx = (face.cx - face.nx) * (HW/.15);   // mirror: your right = chick right
+    const dz = (face.ny - face.cy) * (HL/.11);   // head up = chick forward
+    return [clamp(dx, -HW+.8, HW-.8), clamp(1.5 + dz, -HL+.8, HL-.8)];
+  }
+  if (keys.size) {
+    let x = 0, z = 0;
+    if (keys.has('KeyA') || keys.has('ArrowLeft')) x -= 1; if (keys.has('KeyD') || keys.has('ArrowRight')) x += 1;
+    if (keys.has('KeyW') || keys.has('ArrowUp')) z -= 1; if (keys.has('KeyS') || keys.has('ArrowDown')) z += 1;
+    if (x || z) { pointerT = null; return [clamp(ch.x + x*2.5, -HW+.8, HW-.8), clamp(ch.z + z*2.5, -HL+.8, HL-.8)]; }
+  }
+  return pointerT ? [clamp(pointerT[0], -HW+.8, HW-.8), clamp(pointerT[1], -HL+.8, HL-.8)] : [ch.x, ch.z];
+}
+
+/* ---------------- game state ---------------- */
+const G = { phase:'menu', t:0, elapsed:0, score:0, hearts:GAME.hearts, eggs:0, dodges:0, combo:0, lastEgg:-9, calibT:0, countT:0, endT:0, won:false };
+let timeScale = 1, slow = 0, shake = 0, punch = 0, redFlash = 0, danger = 0;
+const popups = [], callouts = [];
+function popup(x, y, z, text, color){ popups.push({ x, y, z, text, color, t:0 }); }
+function callout(text, color='#ffd23f'){ callouts.length = 0; callouts.push({ text, color, t:0 }); }
+
+function resetRound(){
+  Object.assign(G, { t:0, elapsed:0, score:0, hearts:GAME.hearts, eggs:0, dodges:0, combo:0, lastEgg:-9, endT:0, won:false });
+  Object.assign(ch, { x:0, z:2, y:0, vx:0, vz:0, vy:0, air:false, hopCd:0, inv:0, shield:0, knock:0, sq:0, sqv:0 });
+  hawks.forEach((h,i) => Object.assign(h, { active:false, state:'circle', t:rnd(1.2,2), ang:i*2.1, y:6.5, waveT:-1 }));
+  eggs.forEach(e => { e.alive = false; e.t = rnd(.1,.8); });
+  ring.alive = false; ring.t = 6;
+  face.maxJaw = 0; popups.length = 0; callouts.length = 0; slow = 0; redFlash = 0;
+  if (!face.on) drawDefaultFace();
+}
+
+function stepChick(dt){
+  ch.hopCd = Math.max(0, ch.hopCd-dt); ch.inv = Math.max(0, ch.inv-dt); ch.shield = Math.max(0, ch.shield-dt); ch.knock = Math.max(0, ch.knock-dt);
+  const [tx, tz] = targetPos();
+  const k = ch.knock > 0 ? 6 : 42, c = ch.knock > 0 ? 1.5 : 9.5;
+  ch.vx += ((tx-ch.x)*k - ch.vx*c)*dt; ch.vz += ((tz-ch.z)*k - ch.vz*c)*dt;
+  const sp = len(ch.vx, ch.vz); if (sp > 15) { ch.vx *= 15/sp; ch.vz *= 15/sp; }
+  ch.x += ch.vx*dt; ch.z += ch.vz*dt;
+  const r = .8;
+  if (ch.x < -HW+r) { ch.x = -HW+r; ch.vx = Math.abs(ch.vx)*.7; } if (ch.x > HW-r) { ch.x = HW-r; ch.vx = -Math.abs(ch.vx)*.7; }
+  if (ch.z < -HL+r) { ch.z = -HL+r; ch.vz = Math.abs(ch.vz)*.7; } if (ch.z > HL-r) { ch.z = HL-r; ch.vz = -Math.abs(ch.vz)*.7; }
+  if (ch.y < .6) for (const b of BUMPERS) {
+    const dx = ch.x-b.x, dz = ch.z-b.z, d = len(dx,dz), rr = b.r + r;
+    if (d < rr && d > 1e-4) {
+      const nx = dx/d, nz = dz/d; ch.x = b.x + nx*rr; ch.z = b.z + nz*rr;
+      const vn = ch.vx*nx + ch.vz*nz; if (vn < 0) { ch.vx -= 2*vn*nx; ch.vz -= 2*vn*nz; }
+      ch.vx += nx*11; ch.vz += nz*11; ch.knock = .28; ch.sq = .45; b.flash = 1;
+      burst(b.x+nx*b.r, .7, b.z+nz*b.r, 8, [0xfff2cf, BCOL[b.i]], 5, .4); SFX.bump(); shake = Math.max(shake, .15);
+    }
+  }
+  if (hopReq && !ch.air && ch.hopCd <= 0) { ch.vy = MOTION.hopVelocity; ch.air = true; ch.sq = MOTION.takeoffStretch; ch.sqv = 0; SFX.hop(); burst(ch.x, .1, ch.z, 6, 0xfff2cf, 3, .3); }
+  hopReq = false;
+  if (ch.air) {
+    ch.vy -= MOTION.gravity*dt; ch.y += ch.vy*dt;
+    if (ch.y <= 0) { ch.y = 0; ch.air = false; ch.vy = 0; ch.sq = MOTION.landSquash; ch.sqv = 0; ch.hopCd = .12; SFX.land(); burst(ch.x, .1, ch.z, 5, 0x9a8fc4, 3, .3); }
+  }
+  // squash spring (overshoot = wobble)
+  ch.sqv += (-ch.sq*MOTION.squashSpring - ch.sqv*MOTION.squashDamp)*dt; ch.sq += ch.sqv*dt;
+}
+
+function stepHawk(h, dt){
+  if (!h.active) return;
+  h.t -= dt;
+  if (h.state === 'circle') {
+    h.ang += dt*.85; h.x = Math.cos(h.ang)*3.6; h.z = Math.sin(h.ang)*5 - 1; h.y = 6.5 + Math.sin(G.elapsed*2+h.i)*.3;
+    if (h.t <= 0 && G.phase === 'play' && !hawks.some(o => o !== h && o.state === 'aim' && len(o.tx-ch.x, o.tz-ch.z) < 1)) {
+      h.state = 'aim'; h.t = MOTION.aimTime; h.sx = h.x; h.sz = h.z;
+      h.tx = clamp(ch.x + ch.vx*.3, -HW+1, HW-1); h.tz = clamp(ch.z + ch.vz*.3, -HL+1, HL-1); SFX.aim();
+    }
+  } else if (h.state === 'aim') {
+    const p = 1 - h.t/MOTION.aimTime;
+    if (p < MOTION.aimTrack) { h.tx = lerp(h.tx, clamp(ch.x + ch.vx*.25, -HW+1, HW-1), .07); h.tz = lerp(h.tz, clamp(ch.z + ch.vz*.25, -HL+1, HL-1), .07); }
+    const q = easeOutCubic(Math.min(1, p*1.5));
+    h.x = lerp(h.sx, h.tx, q); h.z = lerp(h.sz, h.tz, q); h.y = 6.5 + p*1.3; // anticipation: rise before the dive
+    if (h.t <= 0) { h.state = 'dive'; h.t = MOTION.diveTime; h.sy = h.y; SFX.dive(); }
+  } else if (h.state === 'dive') {
+    const p = 1 - h.t/MOTION.diveTime;
+    h.x = h.tx; h.z = h.tz; h.y = lerp(h.sy, .7, easeInCubic(clamp(p,0,1)));
+    if (h.t <= 0) { impact(h); h.state = 'rise'; h.t = MOTION.riseTime; }
+  } else if (h.state === 'rise') {
+    const p = 1 - h.t/MOTION.riseTime;
+    h.y = lerp(.7, 6.5, easeOutCubic(clamp(p,0,1)));
+    if (h.t <= 0) { h.state = 'circle'; h.ang = Math.atan2((h.z+1)/5, h.x/3.6); const press = clamp(G.elapsed/GAME.dur, 0, 1); h.t = rnd(1.1, 2.1)*(1 - press*.45); }
+  }
+  if (h.waveT >= 0) h.waveT += dt;
+}
+function impact(h){
+  h.waveT = 0; SFX.impact(); shake = Math.max(shake, MOTION.impactShake);
+  burst(h.tx, .15, h.tz, 12, [0x9a8fc4, 0xfff2cf], 5, .45);
+  if (G.phase !== 'play') return;
+  const d = len(ch.x-h.tx, ch.z-h.tz);
+  if (d < MOTION.hitRadius) {
+    if (ch.y > .35) { G.dodges++; G.score += GAME.dodgePts; popup(ch.x, 2.4, ch.z, `+${GAME.dodgePts}`, '#53e3b7'); callout('闪避！', '#53e3b7'); SFX.dodge(); }
+    else if (ch.inv > 0) {}
+    else if (ch.shield > 0) { ch.shield = 0; ch.inv = .8; callout('护盾挡住了', '#53e3b7'); SFX.shield(); burst(ch.x, 1, ch.z, 16, 0x53e3b7, 6, .5); }
+    else hitChick(h);
+  } else if (d < MOTION.nearRadius && ch.inv <= 0) {
+    G.score += GAME.nearPts; popup(ch.x, 2.2, ch.z, `好险 +${GAME.nearPts}`, '#fff2cf'); SFX.near();
+  }
+}
+function hitChick(h){
+  G.hearts--; ch.inv = 1.6; ch.knock = .45;
+  const d = len(ch.x-h.tx, ch.z-h.tz) || 1;
+  ch.vx = (ch.x-h.tx)/d*12; ch.vz = (ch.z-h.tz)/d*12; ch.sq = .7;
+  slow = MOTION.hitSlowmo; shake = MOTION.hitShake; punch = 1; redFlash = 1;
+  burst(ch.x, 1, ch.z, 30, [0xffffff, 0xffd23f, 0xffe9a8], 7, 1, 9, 1.2); SFX.hit();
+  callout(G.hearts > 0 ? '被啄了！' : '被叼走了…', '#ff5a3c');
+  if (G.hearts <= 0) endRound(false);
+}
+function stepPickups(dt){
+  for (const e of eggs) {
+    if (!e.alive) { e.t -= dt; if (e.t <= 0) { [e.x, e.z] = freeSpot(); e.alive = true; e.born = 0; } continue; }
+    e.born = (e.born || 0) + dt;
+    if (ch.y < 1.2 && len(ch.x-e.x, ch.z-e.z) < 1.05) {
+      e.alive = false; e.t = rnd(.5, 1.6); G.eggs++;
+      G.combo = G.elapsed - G.lastEgg < 2.5 ? G.combo+1 : 1; G.lastEgg = G.elapsed;
+      const pts = GAME.eggPts*G.combo; G.score += pts;
+      popup(e.x, 1.6, e.z, G.combo > 1 ? `+${pts} 连击×${G.combo}` : `+${pts}`, '#ffd23f');
+      burst(e.x, .6, e.z, 12, [0xffd23f, 0xfff2cf], 5, .5); SFX.egg(G.combo); ch.sq = .3;
+    }
+  }
+  if (!ring.alive) { ring.t -= dt; if (ring.t <= 0) { [ring.x, ring.z] = freeSpot(3); ring.alive = true; } }
+  else if (len(ch.x-ring.x, ch.z-ring.z) < 1.1) { ring.alive = false; ring.t = 8; ch.shield = 7; popup(ring.x, 1.8, ring.z, '护盾', '#53e3b7'); burst(ring.x, 1, ring.z, 14, 0x53e3b7, 5, .5); SFX.ring(); }
+}
+
+function endRound(win){
+  if (G.phase !== 'play') return;
+  G.phase = 'end'; G.endT = 0; G.won = win;
+  G.bonus = Math.max(0, G.hearts)*GAME.heartBonus; G.final = G.score + G.bonus;
+  if (win) { callout('时间到！'); SFX.end(); } else SFX.lose();
+  hawks.forEach(h => { if (h.state === 'aim') { h.state = 'rise'; h.t = MOTION.riseTime; h.y = Math.max(h.y, .7); } });
+}
+
+/* ---------------- recording ---------------- */
+let wantRec = true, rec = null, recChunks = [], recBlob = null, recExt = 'webm';
+function startRec(){
+  recBlob = null; $('#saveBtn').hidden = true;
+  if (!wantRec || !out.captureStream || typeof MediaRecorder === 'undefined') return;
+  const tracks = [...out.captureStream(30).getVideoTracks()];
+  if (recDest) tracks.push(...recDest.stream.getAudioTracks());
+  const mime = ['video/mp4;codecs=avc1,mp4a.40.2','video/mp4','video/webm;codecs=vp9,opus','video/webm'].find(m => MediaRecorder.isTypeSupported(m));
+  try { rec = new MediaRecorder(new MediaStream(tracks), mime ? { mimeType:mime, videoBitsPerSecond:6e6 } : undefined); } catch { rec = null; return; }
+  recExt = (rec.mimeType || '').includes('mp4') ? 'mp4' : 'webm';
+  recChunks = []; rec.ondataavailable = e => { if (e.data.size) recChunks.push(e.data); };
+  rec.onstop = () => { recBlob = new Blob(recChunks, { type:rec.mimeType || 'video/webm' }); $('#saveBtn').hidden = false; $('#recBadge').hidden = true; };
+  rec.start(250); $('#recBadge').hidden = false;
+}
+function stopRec(){ if (rec && rec.state === 'recording') rec.stop(); }
+$('#saveBtn').addEventListener('click', () => {
+  if (!recBlob) return;
+  const a = document.createElement('a'); a.href = URL.createObjectURL(recBlob);
+  a.download = `弹弹追鸡-${G.final}分-${new Date().toISOString().slice(0,16).replace(/[:T]/g,'')}.${recExt}`;
+  document.body.appendChild(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 2000);
+});
+
+/* ---------------- menu wiring ---------------- */
+$('#recChk').addEventListener('change', e => wantRec = e.target.checked);
+$('#camBtn').addEventListener('click', async () => {
+  ensureAudio();
+  const btn = $('#camBtn'); btn.disabled = true; btn.textContent = '正在打开摄像头…';
+  try {
+    if (!face.on) { await startCamera(); }
+    btn.textContent = '打开摄像头开始'; btn.disabled = false;
+    beginCalib();
+  } catch (err) {
+    btn.disabled = false; btn.textContent = '再试一次';
+    const msg = err && err.name === 'NotAllowedError' ? '摄像头权限被拒绝了。在地址栏左边的图标里允许摄像头，然后再试一次。' : '人脸识别没加载成功（需要联网下载模型）。可以先用鼠标试玩。';
+    $('#note').innerHTML = `<span class="err">${msg}</span>`;
+  }
+});
+$('#mouseBtn').addEventListener('click', () => { ensureAudio(); face.on = false; beginCalib(); });
+$('#againBtn').addEventListener('click', () => { ensureAudio(); beginCalib(); });
+$('#homeBtn').addEventListener('click', () => { stopRec(); G.phase = 'menu'; resetRound(); $('#endOv').hidden = true; $('#menu').hidden = false; $('#help').hidden = true; });
+function beginCalib(){
+  resetRound();
+  $('#menu').hidden = true; $('#endOv').hidden = true; $('#help').hidden = false;
+  G.phase = 'calib'; G.calibT = 0;
+}
+
+/* ---------------- HUD drawing on the output canvas ---------------- */
+const FONT = s => `${s}px "DotGothic16","Silkscreen","PingFang SC","Microsoft YaHei",monospace`;
+function text(str, x, y, size, color, align='center', stroke=6){
+  ctx.font = FONT(size); ctx.textAlign = align; ctx.textBaseline = 'middle';
+  ctx.lineJoin = 'round'; ctx.lineWidth = stroke; ctx.strokeStyle = '#0b0817'; ctx.strokeText(str, x, y);
+  ctx.fillStyle = color; ctx.fillText(str, x, y);
+}
+function box(x, y, w, h, fill='#2b2250'){
+  ctx.fillStyle = '#0b0817'; ctx.fillRect(x-4, y-4, w+8, h+12);
+  ctx.fillStyle = fill; ctx.fillRect(x, y, w, h);
+  ctx.fillStyle = 'rgba(255,255,255,.08)'; ctx.fillRect(x, y, w, 4);
+}
+const HEART = ['0110110','1111111','1111111','0111110','0011100','0001000'];
+function heart(x, y, on, s=4){ for (let r=0;r<6;r++) for (let c=0;c<7;c++) if (HEART[r][c] === '1') { ctx.fillStyle = on ? '#ff5a3c' : '#4a4170'; ctx.fillRect(x+c*s, y+r*s, s, s); } }
+const _v = new THREE.Vector3();
+function project(x, y, z){ _v.set(x,y,z).project(camera); return [(_v.x*.5+.5)*OW, (-_v.y*.5+.5)*OH]; }
+
+function drawPreview(){
+  const x = 16, y = 16, w = 108, h = 144;
+  box(x, y, w, h, '#0b0817');
+  if (face.on && video.readyState >= 2) {
+    pctx.save(); pctx.translate(36,0); pctx.scale(-1,1);
+    const vw = video.videoWidth, vh = video.videoHeight, sw = vh*.75;
+    pctx.drawImage(video, (vw-sw)/2, 0, sw, vh, 0, 0, 36, 48); pctx.restore();
+    ctx.imageSmoothingEnabled = false; ctx.drawImage(prevC, x, y, w, h);
+    const sx = x + (1 - (face.nx - (video.videoWidth - sw)/2/video.videoWidth)/(sw/video.videoWidth))*w, sy = y + face.ny*h;
+    ctx.fillStyle = face.ok ? '#53e3b7' : '#ff5a3c'; ctx.fillRect(sx-3, sy-3, 6, 6);
+    // mouth meter
+    ctx.fillStyle = '#0b0817'; ctx.fillRect(x, y+h+8, w, 14);
+    ctx.fillStyle = face.jaw > .42 ? '#ff8fb3' : '#9a8fc4'; ctx.fillRect(x+2, y+h+10, (w-4)*clamp(face.jaw/.6, 0, 1), 10);
+    ctx.fillStyle = '#fff2cf'; ctx.fillRect(x + 2 + (w-4)*.7, y+h+8, 2, 14);
+    text('张嘴', x + w/2, y+h+34, 16, '#9a8fc4', 'center', 4);
+  } else {
+    text(face.on ? '摄像头加载中' : '鼠标模式', x+w/2, y+h/2-10, 15, '#9a8fc4', 'center', 4);
+    if (!face.on) text('点击 = 跳', x+w/2, y+h/2+14, 15, '#9a8fc4', 'center', 4);
+  }
+}
+
+function drawHUD(rdt){
+  // danger vignette
+  if (danger > 0) {
+    const g = ctx.createRadialGradient(OW/2, OH/2, OH*.25, OW/2, OH/2, OH*.62);
+    g.addColorStop(0, 'rgba(255,60,40,0)'); g.addColorStop(1, `rgba(255,60,40,${.5*danger})`);
+    ctx.fillStyle = g; ctx.fillRect(0,0,OW,OH);
+  }
+  if (redFlash > 0) { ctx.fillStyle = `rgba(255,90,60,${redFlash*.45})`; ctx.fillRect(0,0,OW,OH); }
+
+  const playing = G.phase === 'play' || G.phase === 'count' || G.phase === 'calib' || G.phase === 'end';
+  if (playing) {
+    drawPreview();
+    // timer
+    const left = Math.max(0, GAME.dur - G.elapsed), s = Math.ceil(left);
+    box(OW/2-62, 18, 124, 52);
+    const tsc = left < 5 && G.phase === 'play' ? 1 + (1 - (left % 1))*.18 : 1;
+    ctx.save(); ctx.translate(OW/2, 46); ctx.scale(tsc, tsc); text(`0:${String(s).padStart(2,'0')}`, 0, 0, 34, left < 5 ? '#ff5a3c' : '#fff2cf'); ctx.restore();
+    // score
+    box(OW-140, 18, 124, 52);
+    text(String(G.score), OW-30, 46, 30, '#ffd23f', 'right');
+    ctx.fillStyle = '#ffe27a'; ctx.fillRect(OW-128, 36, 14, 18); ctx.fillStyle = '#0b0817'; ctx.fillRect(OW-128, 36, 14, 2);
+    // hearts
+    for (let i=0;i<GAME.hearts;i++) heart(OW/2-50 + i*36, 84, i < G.hearts, 4);
+    if (ch.shield > 0) text(`护盾 ${Math.ceil(ch.shield)}`, OW/2, 126, 18, '#53e3b7', 'center', 4);
+  }
+
+  // popups
+  for (let i=popups.length-1;i>=0;i--) {
+    const p = popups[i]; p.t += rdt;
+    if (p.t > 1) { popups.splice(i,1); continue; }
+    const [sx, sy] = project(p.x, p.y, p.z);
+    const sc = p.t < .15 ? easeOutBack(p.t/.15) : 1;
+    ctx.save(); ctx.globalAlpha = p.t > .7 ? 1 - (p.t-.7)/.3 : 1; ctx.translate(sx, sy - easeOutCubic(p.t)*MOTION.popupRise); ctx.scale(sc, sc);
+    text(p.text, 0, 0, 24, p.color); ctx.restore();
+  }
+  // callout
+  for (let i=callouts.length-1;i>=0;i--) {
+    const c = callouts[i]; c.t += rdt;
+    const total = MOTION.calloutIn + MOTION.calloutHold + .2;
+    if (c.t > total) { callouts.splice(i,1); continue; }
+    const sc = c.t < MOTION.calloutIn ? easeOutBack(c.t/MOTION.calloutIn)*1 : 1;
+    ctx.save(); ctx.globalAlpha = c.t > total-.2 ? (total-c.t)/.2 : 1; ctx.translate(OW/2, OH*.36); ctx.scale(sc, sc); ctx.rotate(-.04);
+    text(c.text, 0, 0, 64, c.color, 'center', 12); ctx.restore();
+  }
+
+  if (G.phase === 'calib') {
+    const [cx, cy] = [OW/2, OH*.42];
+    box(40, cy-80, OW-80, 160);
+    if (face.on) {
+      text(face.ok ? '保持不动…' : '把脸放进摄像头画面里', cx, cy-30, 30, '#fff2cf');
+      text('正对屏幕，脑袋放在舒服的位置', cx, cy+16, 20, '#9a8fc4', 'center', 4);
+      ctx.fillStyle = '#0b0817'; ctx.fillRect(cx-120, cy+44, 240, 14);
+      ctx.fillStyle = '#53e3b7'; ctx.fillRect(cx-118, cy+46, 236*clamp(G.calibT/.9, 0, 1), 10);
+    } else {
+      text('鼠标移到哪，小鸡跑到哪', cx, cy-24, 28, '#fff2cf');
+      text('点击跳起来躲老鹰', cx, cy+22, 24, '#9a8fc4', 'center', 4);
+    }
+  }
+  if (G.phase === 'count') {
+    const n = Math.ceil(G.countT), f = 1 - (G.countT % 1);
+    const sc = easeOutBack(Math.min(1, f/.25));
+    ctx.save(); ctx.translate(OW/2, OH*.42); ctx.scale(sc*1.2, sc*1.2); text(n > 0 ? String(n) : '跑！', 0, 0, 96, '#ffd23f', 'center', 14); ctx.restore();
+    text('转头移动 · 张嘴跳', OW/2, OH*.56, 26, '#fff2cf');
+  }
+  if (G.phase === 'play' && G.elapsed < 4) {
+    ctx.globalAlpha = G.elapsed > 3.4 ? (4 - G.elapsed)/.6 : 1;
+    box(30, OH-110, OW-60, 64, '#0b0817');
+    text(face.on ? '红圈 = 老鹰要俯冲 · 张嘴跳起来躲' : '红圈 = 老鹰要俯冲 · 点击跳起来躲', OW/2, OH-80, 22, '#fff2cf', 'center', 4);
+    ctx.globalAlpha = 1;
+  }
+  if (G.phase === 'end' && G.endT > .7) drawCard(G.endT - .7);
+  if (timeScale !== 1) text('慢放 ×0.25', OW/2, OH-24, 18, '#53e3b7', 'center', 4);
+}
+
+const RANKS = [[0,'被叼走的小鸡'],[60,'灵活小鸡'],[130,'铁头小鸡'],[220,'鸡中之王']];
+function drawCard(t){
+  const p = clamp(t/MOTION.cardIn, 0, 1);
+  const y0 = (1 - easeOutBack(p))*OH*.7;
+  ctx.fillStyle = `rgba(17,12,34,${.65*p})`; ctx.fillRect(0,0,OW,OH);
+  const w = 440, h = 560, x = (OW-w)/2, y = 120 + y0;
+  box(x, y, w, h, '#2b2250');
+  ctx.fillStyle = '#382d66'; ctx.fillRect(x+10, y+10, w-20, h-20);
+  const rank = RANKS.filter(r => G.final >= r[0]).pop()[1];
+  text(G.won ? '活下来了！' : '被叼走了…', OW/2, y+50, 26, G.won ? '#53e3b7' : '#ff5a3c', 'center', 6);
+  text(rank, OW/2, y+96, 44, '#ffd23f', 'center', 10);
+  // funniest face
+  const fs = 168, fx = OW/2 - fs/2, fy = y+132;
+  ctx.fillStyle = '#ffd23f'; ctx.beginPath(); ctx.arc(OW/2, fy+fs/2, fs/2+10, 0, 7); ctx.fill();
+  ctx.imageSmoothingEnabled = false; ctx.drawImage(snapC, fx, fy, fs, fs);
+  if (G.final >= 130) { ctx.fillStyle = '#ffd23f'; ctx.strokeStyle = '#0b0817'; ctx.lineWidth = 5; ctx.beginPath(); ctx.moveTo(OW/2-46, fy-6); ctx.lineTo(OW/2-46, fy-40); ctx.lineTo(OW/2-22, fy-22); ctx.lineTo(OW/2, fy-46); ctx.lineTo(OW/2+22, fy-22); ctx.lineTo(OW/2+46, fy-40); ctx.lineTo(OW/2+46, fy-6); ctx.closePath(); ctx.stroke(); ctx.fill(); }
+  if (face.on) text('你张嘴最大的一瞬间', OW/2, fy+fs+28, 16, '#9a8fc4', 'center', 4);
+  const sp = clamp((t - .35)/MOTION.scoreCount, 0, 1);
+  text(String(Math.round(G.final*easeOutCubic(sp))), OW/2, y+376, 64, '#fff2cf', 'center', 10);
+  text(`金蛋 ${G.eggs}   闪避 ${G.dodges}   生命 +${G.bonus}`, OW/2, y+430, 20, '#9a8fc4', 'center', 4);
+  ctx.fillStyle = '#0b0817'; ctx.fillRect(x+30, y+464, w-60, 60);
+  text('@你的朋友 来挑战我的分数', OW/2, y+494, 22, '#ffd23f', 'center', 4);
+  text('BOUNCE FLOCK · 弹弹追鸡', OW/2, y+h+30, 16, '#9a8fc4', 'center', 4);
+}
+
+/* ---------------- main loop ---------------- */
+let last = performance.now();
+function frame(now){
+  requestAnimationFrame(frame);
+  const rdt = Math.min(.05, (now-last)/1000); last = now;
+  pollFace(now);
+  if (face.on && face.ok && face.jaw > .42 && face.armed) { face.armed = false; hopReq = true; }
+  if (face.jaw < .22) face.armed = true;
+  const dt = rdt * timeScale * (slow > 0 ? MOTION.slowScale : 1);
+  slow = Math.max(0, slow - rdt*timeScale);
+
+  if (G.phase === 'menu') {
+    G.elapsed += dt;
+    const t = G.elapsed; pointerT = [Math.sin(t*.7)*3, 1.5 + Math.sin(t*.5)*3]; if (!face.on) hopReq = Math.random() < .006;
+    hawks[0].active = true; stepChick(dt); stepHawk(hawks[0], dt);
+    if (hawks[0].state === 'circle' && hawks[0].t <= 0) hawks[0].t = 2;
+  } else if (G.phase === 'calib') {
+    stepChick(dt);
+    if (!face.on) { G.calibT += rdt; if (G.calibT > 1.6) { G.phase = 'count'; G.countT = 3; startRec(); } }
+    else if (face.ok) { G.calibT += rdt; if (G.calibT > .9) { face.cx = face.nx; face.cy = face.ny; G.phase = 'count'; G.countT = 3; startRec(); } }
+    else G.calibT = 0;
+  } else if (G.phase === 'count') {
+    const before = Math.ceil(G.countT); G.countT -= rdt; const after = Math.ceil(G.countT);
+    if (after !== before) after > 0 ? SFX.count() : SFX.go();
+    stepChick(dt);
+    if (G.countT <= -.35) { G.phase = 'play'; G.elapsed = 0; }
+  } else if (G.phase === 'play') {
+    G.elapsed += dt;
+    GAME.hawkAt.forEach((at, i) => { if (G.elapsed >= at && !hawks[i].active) { hawks[i].active = true; hawks[i].state = 'circle'; hawks[i].t = 1.2; if (i) callout(`老鹰 +1`, '#ff5a3c'); } });
+    stepChick(dt); hawks.forEach(h => stepHawk(h, dt)); stepPickups(dt);
+    if (G.elapsed >= GAME.dur) endRound(true);
+  } else if (G.phase === 'end') {
+    G.endT += rdt; stepChick(dt); hawks.forEach(h => stepHawk(h, dt));
+    if (G.endT > 1.6 && $('#endOv').hidden) { $('#endOv').hidden = false; $('#help').hidden = true; }
+    if (G.endT > 3.2) stopRec();
+  }
+
+  // danger cue: any hawk aiming near the chick
+  const aiming = G.phase === 'play' && hawks.some(h => h.active && h.state === 'aim' && len(h.tx-ch.x, h.tz-ch.z) < 2.2);
+  danger = lerp(danger, aiming ? .6 + Math.sin(now/90)*.4 : 0, Math.min(1, rdt*10));
+  if (aiming && now - lastBeat > 280) { lastBeat = now; SFX.beat(); }
+  redFlash = Math.max(0, redFlash - rdt*2.2);
+  for (const b of BUMPERS) b.flash = Math.max(0, b.flash - rdt*4);
+
+  // ---- visuals ----
+  const t = now/1000;
+  const cm = ch.mesh;
+  cm.root.position.set(ch.x, 0, ch.z);
+  const airS = ch.air ? clamp(ch.vy/MOTION.hopVelocity, -1, 1)*-.18 : 0;
+  const s = ch.sq + airS;
+  cm.body.scale.set(1+s*.35, 1-s*.45, 1+s*.35);
+  cm.body.position.y = .8*(1-s*.45) + ch.y;
+  cm.body.rotation.y = clamp(ch.vx*.05, -.5, .5);
+  cm.body.rotation.z = -clamp(ch.vx*.03, -.3, .3);
+  const flap = ch.air ? .9 + Math.sin(t*30)*.4 : (len(ch.vx,ch.vz) > 3 ? Math.abs(Math.sin(t*16))*.6 : .08);
+  cm.wings.forEach((w,i) => w.rotation.z = (i ? 1 : -1)*flap);
+  cm.shadow.scale.setScalar(Math.max(.4, 1 - ch.y*.12));
+  cm.shield.visible = ch.shield > 0; cm.shield.rotation.y = t*2;
+  cm.root.visible = !(ch.inv > 0 && Math.floor(t*14) % 2 === 0);
+  for (const h of hawks) {
+    const m = h.mesh, vis = h.active;
+    m.root.visible = m.shadow.visible = vis;
+    m.ret.visible = vis && h.state === 'aim';
+    if (!vis) { m.wave.visible = false; continue; }
+    m.root.position.set(h.x, h.y, h.z);
+    const dir = h.state === 'circle' ? h.ang + Math.PI : Math.atan2(h.tx - h.x, h.tz - h.z);
+    m.body.rotation.y = h.state === 'circle' ? -h.ang : (h.state === 'aim' || h.state === 'dive' ? Math.atan2(ch.x-h.x, ch.z-h.z) : m.body.rotation.y);
+    m.body.rotation.x = h.state === 'dive' ? .9 : h.state === 'aim' ? -.25 : 0;
+    const wf = h.state === 'dive' ? -1.1 : h.state === 'aim' ? Math.sin(t*22)*.5 : Math.sin(t*8 + h.i)*.45;
+    m.wings.forEach((w,i) => w.rotation.z = (i ? 1 : -1)*wf);
+    m.shadow.position.set(h.x, .03, h.z); m.shadow.scale.setScalar(clamp(1.6 - h.y*.15, .5, 1.6)); m.shadow.material.opacity = clamp(.55 - h.y*.04, .15, .5);
+    if (h.state === 'aim') {
+      const p = 1 - h.t/MOTION.aimTime;
+      m.ret.position.set(h.tx, 0, h.tz); m.ret.scale.setScalar(lerp(1.7, 1, easeOutCubic(p)));
+      m.rr.material.opacity = Math.floor(t*(6 + p*14)) % 2 ? 1 : .35;
+    }
+    if (h.waveT >= 0 && h.waveT < .4) {
+      const p = h.waveT/.4; m.wave.visible = true; m.wave.position.set(h.tx, .06, h.tz); m.wave.scale.setScalar(.6 + easeOutCubic(p)*3); m.wave.material.opacity = 1-p;
+    } else m.wave.visible = false;
+  }
+  eggs.forEach((e,i) => { e.m.visible = e.alive; if (e.alive) { const pop = easeOutBack(Math.min(1, (e.born||0)/.3)); e.m.position.set(e.x, .55 + Math.sin(t*3+i)*.12, e.z); e.m.scale.set(pop, 1.3*pop, pop); e.m.rotation.y = t*1.5; } });
+  ringM.visible = ring.alive; if (ring.alive) { ringM.position.set(ring.x, 1 + Math.sin(t*3)*.15, ring.z); ringM.rotation.set(Math.PI/2, 0, t*2); }
+  bumperMeshes.forEach((m,i) => { const f = BUMPERS[i].flash; m.cap.scale.set(1+f*.2, 1-f*.18, 1+f*.2); m.capMat.emissiveIntensity = f; });
+  stepParts(dt);
+
+  // camera: gentle follow + shake + punch-in
+  shake = Math.max(0, shake - rdt*1.8); punch = Math.max(0, punch - rdt*2.5);
+  camera.fov = 55 - easeOutCubic(punch)*MOTION.punchFov; camera.updateProjectionMatrix();
+  camera.position.set(CAM_BASE.x + ch.x*.22 + (Math.random()-.5)*shake, CAM_BASE.y + (Math.random()-.5)*shake, CAM_BASE.z + ch.z*.1);
+  camera.lookAt(ch.x*.22, 0, -.6 + ch.z*.1);
+
+  renderer.render(scene, camera);
+  ctx.imageSmoothingEnabled = false;
+  ctx.drawImage(glc, 0, 0, OW, OH);
+  drawHUD(rdt);
+}
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>

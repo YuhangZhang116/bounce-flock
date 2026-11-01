@@ -1,0 +1,1363 @@
+<!doctype html>
+<html lang="zh">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>弹弹追鸡 · 联机特效版</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DotGothic16&family=Silkscreen:wght@400;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --ink:#1a1430; --line:#0b0817; --panel:#2b2250; --panel2:#382d66;
+  --cream:#fff2cf; --dim:#9a8fc4; --yolk:#ffd23f; --hawk:#ff5a3c; --mint:#53e3b7; --pink:#ff8fb3; --muscle:#ff8a3c;
+  --f:"DotGothic16","Silkscreen","PingFang SC","Microsoft YaHei",monospace;
+  color-scheme:dark;
+}
+[hidden]{display:none!important}
+html,body{margin:0;height:100%;height:100dvh;overflow:hidden;background:#0f0b1f;color:var(--cream);font-family:var(--f);overscroll-behavior:none}
+body{display:grid;place-items:center;touch-action:none;user-select:none;-webkit-user-select:none}
+#frame{position:relative;width:min(100vw,56.25vh);height:min(100vh,177.78vw);width:min(100vw,56.25dvh);height:min(100dvh,177.78vw);container-type:size;background:var(--ink);box-shadow:0 0 0 4px var(--line)}
+#out{position:absolute;inset:0;width:100%;height:100%;image-rendering:pixelated;display:block;touch-action:none}
+#joy{position:absolute;width:26cqw;height:26cqw;margin:-13cqw 0 0 -13cqw;border:.8cqw solid rgba(255,242,207,.55);background:rgba(11,8,23,.35);border-radius:50%;pointer-events:none}
+#joy i{position:absolute;left:50%;top:50%;width:11cqw;height:11cqw;margin:-5.5cqw 0 0 -5.5cqw;background:var(--yolk);border:.8cqw solid var(--line);border-radius:50%}
+#jumpBtn{position:absolute;right:max(4cqw,env(safe-area-inset-right,0px));bottom:calc(9cqh + env(safe-area-inset-bottom,0px));width:24cqw;height:24cqw;border-radius:50%;padding:0;font-size:7cqw;background:var(--yolk);color:var(--line);touch-action:none}
+#jumpBtn.hawk{background:var(--hawk)}
+.ov{touch-action:pan-y;position:absolute;inset:0;display:flex;flex-direction:column;justify-content:center;align-items:stretch;gap:2.4cqh;padding:6cqw;box-sizing:border-box;background:rgba(17,12,34,.78);overflow:auto}
+.ov.end{background:transparent;justify-content:flex-end;padding-bottom:4cqh;gap:1.6cqh}
+h1{margin:0;font-weight:400;font-size:13cqw;line-height:1.05;color:var(--yolk);text-shadow:0 .9cqw 0 var(--line),.7cqw 0 0 var(--hawk)}
+.sub{font-family:"Silkscreen",monospace;color:var(--mint);font-size:3cqw;letter-spacing:.2em;margin-top:1cqh}
+ol{margin:0;padding:0;list-style:none;display:flex;flex-direction:column;gap:1.2cqh}
+ol li{display:flex;gap:3cqw;align-items:center;font-size:3.7cqw;line-height:1.35;background:var(--line);padding:1.8cqw 3cqw}
+ol b{flex:0 0 auto;width:7cqw;height:7cqw;display:grid;place-items:center;background:var(--c);color:var(--line);font-weight:400}
+button{font:inherit;cursor:pointer;color:var(--cream);background:var(--panel2);border:.8cqw solid var(--line);box-shadow:inset 0 -1cqw 0 rgba(0,0,0,.28),0 .8cqw 0 var(--line);padding:2.4cqw 3cqw;font-size:4.4cqw}
+button:active{transform:translateY(.8cqw);box-shadow:inset 0 -.5cqw 0 rgba(0,0,0,.28)}
+button:focus-visible,input:focus-visible{outline:.8cqw solid var(--yolk);outline-offset:.6cqw}
+button.big{background:var(--yolk);color:var(--line);font-size:5.6cqw}
+button[disabled]{opacity:.5;cursor:wait}
+input.tx{font:inherit;font-size:4.6cqw;background:var(--line);color:var(--cream);border:.8cqw solid var(--panel2);padding:2cqw 2.6cqw;min-width:0;box-sizing:border-box;width:100%}
+.row{display:flex;gap:3cqw;align-items:stretch}.row>*{flex:1;min-width:0}
+.row>.narrow{flex:0 0 auto}
+label.ck{display:flex;align-items:center;gap:2cqw;font-size:3.7cqw}
+label.ck input{width:5cqw;height:5cqw;accent-color:var(--hawk)}
+.note{font-size:3.1cqw;color:var(--dim);line-height:1.5;margin:0}
+.err{color:var(--hawk)}
+.lbl{font-size:3.4cqw;color:var(--dim)}
+#codeBig{font-family:"Silkscreen",monospace;font-size:15cqw;letter-spacing:.18em;text-align:center;color:var(--yolk);background:var(--line);padding:1cqh 0}
+#plist{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:1cqh}
+#plist li{display:flex;align-items:center;gap:3cqw;background:var(--line);padding:1.6cqw 2.6cqw;font-size:4.2cqw}
+#plist img,#plist i{width:9cqw;height:9cqw;image-rendering:pixelated;background:var(--yolk);border-radius:50%;flex:0 0 auto}
+#plist em{margin-left:auto;font-style:normal;font-size:3.2cqw;color:var(--mint)}
+#recBadge{position:absolute;bottom:4.5cqh;right:3cqw;font-family:"Silkscreen",monospace;font-size:3.2cqw;background:var(--hawk);color:var(--line);padding:.6cqw 1.6cqw;animation:blink 1s steps(2) infinite}
+@keyframes blink{50%{opacity:.35}}
+#help{position:absolute;bottom:1.2cqh;left:0;right:0;text-align:center;font-size:2.8cqw;color:var(--dim);pointer-events:none}
+#netTag{position:absolute;top:1cqh;left:50%;transform:translateX(-50%);font-size:2.8cqw;color:var(--mint);pointer-events:none}
+@media (prefers-reduced-motion:reduce){#recBadge{animation:none}}
+</style>
+</head>
+<body>
+<div id="frame">
+  <canvas id="out" aria-label="游戏画面"></canvas>
+
+  <div class="ov" id="menu">
+    <div><h1>弹弹追鸡</h1><div class="sub">FACE PVP · 2–5 PLAYERS</div></div>
+    <ol>
+      <li><b style="--c:var(--yolk)">1</b>每人用自己的摄像头，转动脑袋移动</li>
+      <li><b style="--c:var(--hawk)">2</b>一人当老鹰：张嘴锁定，红圈落下就俯冲抓人</li>
+      <li><b style="--c:var(--muscle)">3</b>其他人当小鸡：张嘴跳起来躲，抢「?」盒子变身肌肉男小鸡</li>
+    </ol>
+    <input class="tx" id="nick" maxlength="8" placeholder="你的名字" autocomplete="off">
+    <button class="big" id="createBtn" type="button">创建房间</button>
+    <div class="row">
+      <input class="tx" id="codeIn" maxlength="4" placeholder="房间号" autocomplete="off" style="text-transform:uppercase">
+      <button class="narrow" id="joinBtn" type="button">加入</button>
+    </div>
+    <button id="soloBtn" type="button">单人练习（电脑当老鹰）</button>
+    <div class="row">
+      <label class="ck"><input type="checkbox" id="camChk" checked>用摄像头</label>
+      <label class="ck"><input type="checkbox" id="recChk" checked>录下每一局</label>
+    </div>
+    <p class="note" id="note">人脸只在你自己的设备上识别，只会把你 24×24 的像素头像发给同房间的人。不开摄像头也能玩：手指拖动移动，右下按钮跳。</p>
+  </div>
+
+  <div class="ov" id="lobby" hidden>
+    <div class="lbl">房间号 · 发给朋友</div>
+    <div id="codeBig">----</div>
+    <button id="copyBtn" type="button">复制房间号</button>
+    <ul id="plist"></ul>
+    <button class="big" id="startBtn" type="button">开始这一局</button>
+    <p class="note" id="waitTxt">等房主开局…</p>
+    <p class="note">空位由电脑小鸡补齐。老鹰每局轮换。</p>
+    <button id="leaveBtn" type="button">离开房间</button>
+  </div>
+
+  <div class="ov end" id="endOv" hidden>
+    <div class="row">
+      <button class="big" id="againBtn" type="button">再来一局</button>
+      <button id="saveBtn" type="button" hidden>保存视频</button>
+    </div>
+    <p class="note" id="endWait" style="text-align:center" hidden>等房主开下一局…</p>
+    <button id="homeBtn" type="button">离开</button>
+  </div>
+
+  <div id="joy" hidden><i></i></div>
+  <button id="jumpBtn" type="button" hidden>跳</button>
+  <div id="recBadge" hidden>● REC</div>
+  <div id="help" hidden data-desk>M 慢放 · C 重新校准 · 空格也能张嘴</div>
+  <div id="netTag" hidden></div>
+</div>
+
+<script type="module">
+import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js';
+const MP = 'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14';
+const FACE_MODEL = 'https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task';
+const PEERJS = 'https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js';
+const LOCAL = new URLSearchParams(location.search).has('local'); // 本机多标签测试（BroadcastChannel）
+
+/* =====================================================================
+   动效规范 MOTION SPEC
+   ===================================================================== */
+const MOTION = {
+  hopVelocity:9.5, gravity:30, takeoffStretch:-.55, landSquash:.55, squashSpring:190, squashDamp:11,
+  hawkHeight:6, hawkFly:13.5, hawkRetSpeed:3.2,
+  hawkAim:.62, hawkAimQuick:.3, hawkDive:.24, hawkRise:.55, hawkCd:.75,
+  hitRadius:1.3, clawMul:1.7, nearRadius:2.3,
+  hitSlowmo:.3, slowScale:.25, hitShake:.8, impactShake:.28, punchFov:7,
+  punchStun:1.6, fakeStun:.6,
+  calloutIn:.18, calloutHold:.6, popupRise:70, cardIn:.6, scoreCount:.9,
+  muscleScale:1.55, flexEvery:1.1,
+};
+const GAME = { dur:50, hearts:2, minChicks:3, eggPts:10, dodgePts:5, catchPts:30, hitPts:10, punchPts:15, hawkBuffEvery:12, itemEvery:4, maxItems:3, eggs:5 };
+const BUFFS = {
+  muscle:{ name:'肌肉男小鸡', dur:6, color:'#ff8a3c', w:.34 },
+  speed: { name:'闪电小鸡',   dur:6, color:'#ffd23f', w:.26 },
+  decoy: { name:'分身术',     dur:6, color:'#ff8fb3', w:.2 },
+  ghost: { name:'隐身',       dur:5, color:'#9be7ff', w:.2 },
+};
+const BUFF_KEYS = Object.keys(BUFFS);
+const HAWK_BUFFS = { claw:{ name:'巨爪', color:'#ff5a3c' }, quick:{ name:'闪电俯冲', color:'#ffd23f' } };
+const HB_KEYS = Object.keys(HAWK_BUFFS);
+
+const $ = s => document.querySelector(s);
+const clamp = (v,a,b) => Math.max(a, Math.min(b, v));
+const lerp = (a,b,t) => a + (b-a)*t;
+const rnd = (a,b) => a + Math.random()*(b-a);
+const len = (x,z) => Math.hypot(x,z);
+const r2 = v => Math.round(v*100)/100;
+const easeOutBack = t => { const c1 = 1.70158, c3 = c1+1; return 1 + c3*Math.pow(t-1,3) + c1*Math.pow(t-1,2); };
+const easeInCubic = t => t*t*t;
+const easeOutCubic = t => 1 - Math.pow(1-t, 3);
+const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
+let store = {}; try { store = JSON.parse(localStorage.getItem('bflock') || '{}'); } catch {}
+const save = () => { try { localStorage.setItem('bflock', JSON.stringify(store)); } catch {} };
+
+/* ---------------- output canvas ---------------- */
+// 手机全面屏：按屏幕比例拉长画面（9:16 到 9:20），电脑固定 9:16
+const ASPECT = matchMedia('(pointer:coarse)').matches ? clamp(innerHeight/innerWidth, 16/9, 20/9) : 16/9;
+const OW = 540, OH = Math.round(OW*ASPECT/3)*3, SC = 3, LW = OW/SC, LH = OH/SC;
+const out = $('#out'); out.width = OW; out.height = OH;
+{ const fr = $('#frame'); fr.style.width = `min(100vw, calc(100dvh / ${ASPECT}))`; fr.style.height = `min(100dvh, calc(100vw * ${ASPECT}))`; }
+const ctx = out.getContext('2d');
+
+/* ---------------- three.js ---------------- */
+const renderer = new THREE.WebGLRenderer({ antialias:false, preserveDrawingBuffer:true });
+renderer.setPixelRatio(1); renderer.setSize(LW, LH, false);
+const glc = renderer.domElement;
+const scene = new THREE.Scene(); scene.background = new THREE.Color(0x140f26);
+const camera = new THREE.PerspectiveCamera(55, LW/LH, .1, 100);
+const HW = 8, HL = 12;
+const GRAD = (() => { const t = new THREE.DataTexture(new Uint8Array([70,150,255]), 3, 1, THREE.RedFormat); t.minFilter = t.magFilter = THREE.NearestFilter; t.needsUpdate = true; return t; })();
+const toon = (c, x={}) => new THREE.MeshToonMaterial({ color:c, gradientMap:GRAD, ...x });
+const OUT = new THREE.MeshBasicMaterial({ color:0x0b0817, side:THREE.BackSide });
+scene.add(new THREE.HemisphereLight(0xc9c0ff, 0x2a1d4a, .95));
+const sun = new THREE.DirectionalLight(0xfff0d0, 1.6); sun.position.set(-6, 18, 9); scene.add(sun);
+function ctex(w, h, draw){ const c = document.createElement('canvas'); c.width = w; c.height = h; draw(c.getContext('2d'), w, h); const t = new THREE.CanvasTexture(c); t.magFilter = t.minFilter = THREE.NearestFilter; t.colorSpace = THREE.SRGBColorSpace; return t; }
+
+const floorTex = ctex(HW*8, HL*8, (g,w,h) => {
+  for (let y=0;y<h;y+=4) for (let x=0;x<w;x+=4) { g.fillStyle = ((x+y)/4)%2 ? '#2e2560' : '#352a6e'; g.fillRect(x,y,4,4); }
+  g.strokeStyle = '#53e3b7'; g.strokeRect(2.5,2.5,w-5,h-5);
+  g.fillStyle = 'rgba(255,210,63,.18)'; g.fillRect(w/2-8, h/2-8, 16, 16);
+});
+const floor = new THREE.Mesh(new THREE.PlaneGeometry(HW*2, HL*2), toon(0xffffff, { map:floorTex })); floor.rotation.x = -Math.PI/2; scene.add(floor);
+const under = new THREE.Mesh(new THREE.PlaneGeometry(80,80), new THREE.MeshBasicMaterial({ color:0x0f0b1f })); under.rotation.x = -Math.PI/2; under.position.y = -.02; scene.add(under);
+const brick = ctex(16, 8, g => { g.fillStyle='#ff8fb3'; g.fillRect(0,0,16,8); g.fillStyle='#d9628f'; g.fillRect(0,3,16,1); g.fillRect(0,7,16,1); g.fillRect(7,0,1,3); g.fillRect(3,4,1,3); g.fillRect(11,4,1,3); });
+function wall(w, d, x, z){ const t = brick.clone(); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(Math.max(w,d)/1.4, 1); t.needsUpdate = true;
+  const m = new THREE.Mesh(new THREE.BoxGeometry(w, 1.2, d), toon(0xffffff, { map:t })); m.position.set(x, .6, z); scene.add(m); }
+wall(HW*2+2, 1, 0, -HL-.5); wall(HW*2+2, 1, 0, HL+.5); wall(1, HL*2, -HW-.5, 0); wall(1, HL*2, HW+.5, 0);
+
+const BUMPERS = [[-3.6,-6],[3.6,-6],[0,-2.2],[-4.4,2],[4.4,2],[0,5.8],[-5.2,8.6],[5.2,8.6],[-5.4,-9.2],[5.4,-9.2]].map(([x,z],i) => ({ x, z, r:.85, flash:0, i }));
+const BCOL = [0xff8fb3, 0x53e3b7, 0xffd23f, 0x53e3b7, 0xff8fb3, 0xffd23f, 0xff8fb3, 0x53e3b7, 0x53e3b7, 0xff8fb3];
+const bumperMeshes = BUMPERS.map((b,i) => {
+  const g = new THREE.Group();
+  const base = new THREE.Mesh(new THREE.CylinderGeometry(b.r, b.r*1.08, .35, 10), toon(0x2b2250)); base.position.y = .17;
+  const capMat = toon(BCOL[i], { emissive:BCOL[i], emissiveIntensity:0 });
+  const cap = new THREE.Mesh(new THREE.CylinderGeometry(b.r*.85, b.r*.85, .45, 10), capMat); cap.position.y = .55;
+  const o = new THREE.Mesh(cap.geometry, OUT); o.scale.setScalar(1.1); cap.add(o);
+  const top = new THREE.Mesh(new THREE.CylinderGeometry(b.r*.4, b.r*.4, .16, 10), toon(0xfff2cf)); top.position.y = .85;
+  g.add(base, cap, top); g.position.set(b.x, 0, b.z); scene.add(g);
+  return { cap, capMat };
+});
+
+// particles
+const PMAX = 300;
+const pMesh = new THREE.InstancedMesh(new THREE.BoxGeometry(.16,.16,.16), new THREE.MeshBasicMaterial({ color:0xffffff }), PMAX);
+pMesh.frustumCulled = false; scene.add(pMesh);
+const parts = Array.from({length:PMAX}, () => ({ life:0 }));
+for (let i=0;i<PMAX;i++) pMesh.setColorAt(i, new THREE.Color(1,1,1));
+let pNext = 0;
+const _m = new THREE.Matrix4(), _q = new THREE.Quaternion(), _s = new THREE.Vector3(), _p = new THREE.Vector3(), _c = new THREE.Color();
+function burst(x, y, z, n, colors, spd=5, life=.6, grav=14, size=1){
+  for (let k=0;k<n;k++) {
+    const i = pNext, p = parts[i]; pNext = (pNext+1) % PMAX;
+    const a = Math.random()*Math.PI*2, u = .4 + Math.random();
+    Object.assign(p, { x, y, z, vx:Math.cos(a)*spd*u, vz:Math.sin(a)*spd*u, vy:rnd(.3,1)*spd, life:life*rnd(.6,1.2), g:grav, s:size*rnd(.7,1.3) });
+    p.max = p.life;
+    pMesh.setColorAt(i, _c.set(Array.isArray(colors) ? colors[k % colors.length] : colors));
+  }
+  pMesh.instanceColor.needsUpdate = true;
+}
+function stepParts(dt){
+  for (let i=0;i<PMAX;i++) {
+    const p = parts[i];
+    if (p.life > 0) {
+      p.life -= dt; p.vy -= p.g*dt; p.x += p.vx*dt; p.y += p.vy*dt; p.z += p.vz*dt;
+      if (p.y < .08) { p.y = .08; p.vy *= -.4; p.vx *= .7; p.vz *= .7; }
+      const s = p.s * Math.max(0, p.life/p.max);
+      _m.compose(_p.set(p.x,p.y,p.z), _q, _s.set(s,s,s));
+    } else _m.compose(_p.set(0,-50,0), _q, _s.set(0,0,0));
+    pMesh.setMatrixAt(i, _m);
+  }
+  pMesh.instanceMatrix.needsUpdate = true;
+}
+// shockwave pool
+const waves = [0,1,2,3].map(() => { const m = new THREE.Mesh(new THREE.RingGeometry(.85, 1, 24), new THREE.MeshBasicMaterial({ color:0xfff2cf, transparent:true, depthWrite:false, side:THREE.DoubleSide })); m.rotation.x = -Math.PI/2; m.visible = false; scene.add(m); return { m, t:-1, max:3.6 }; });
+let waveNext = 0;
+function wave(x, z, size=3.6, color=0xfff2cf){ const w = waves[waveNext]; waveNext = (waveNext+1)%waves.length; w.t = 0; w.max = size; w.m.material.color.set(color); w.m.position.set(x, .06, z); }
+
+/* ---------------- faces (yours + everyone else's) ---------------- */
+const FPX = 24;
+function circleMaskAndQuantize(c){
+  const g = c.getContext('2d', { willReadFrequently:true });
+  const img = g.getImageData(0,0,FPX,FPX), d = img.data, ce = (FPX-1)/2;
+  for (let y=0;y<FPX;y++) for (let x=0;x<FPX;x++) {
+    const i = (y*FPX+x)*4, r = Math.hypot(x-ce, y-ce);
+    if (r > ce+.4) { d[i+3] = 0; continue; }
+    if (r > ce-.8) { d[i]=11; d[i+1]=8; d[i+2]=23; d[i+3]=255; continue; }
+    for (let k=0;k<3;k++) { let v = d[i+k]/255; v = clamp((v-.5)*1.25+.54, 0, 1); d[i+k] = Math.round(v*5)/5*255; }
+    d[i] = Math.min(255, d[i]+10); d[i+3] = 255;
+  }
+  g.putImageData(img, 0, 0);
+}
+const CHICK_TINTS = ['#ffd23f','#ffe27a','#ffc93c','#fff08a','#ffb84a'];
+function drawChickFace(c, tint='#ffd23f', mood=0){
+  const g = c.getContext('2d'); g.clearRect(0,0,FPX,FPX);
+  g.fillStyle = tint; g.beginPath(); g.arc(FPX/2, FPX/2, FPX/2, 0, 7); g.fill();
+  g.fillStyle = '#0b0817'; g.fillRect(7,9,2,4); g.fillRect(15,9,2,4);
+  if (mood) { g.fillRect(6,7,4,1); g.fillRect(14,7,4,1); }
+  g.fillStyle = '#ff9a2e'; g.fillRect(10,14,4,2); g.fillRect(11,16,2,1);
+  g.fillStyle = '#ff8fb3'; g.fillRect(4,14,3,2); g.fillRect(17,14,3,2);
+  circleMaskAndQuantize(c);
+}
+const faces = new Map(); // key -> { c, tex, real }
+function faceFor(key, tint){
+  let f = faces.get(key);
+  if (!f) {
+    const c = document.createElement('canvas'); c.width = c.height = FPX; drawChickFace(c, tint || CHICK_TINTS[Math.abs(hashStr(key)) % CHICK_TINTS.length]);
+    const tex = new THREE.CanvasTexture(c); tex.magFilter = tex.minFilter = THREE.NearestFilter; tex.colorSpace = THREE.SRGBColorSpace;
+    f = { c, tex, real:false }; faces.set(key, f);
+  }
+  return f;
+}
+function hashStr(s){ let h = 0; for (const ch of String(s)) h = (h*31 + ch.charCodeAt(0))|0; return h; }
+function setRemoteFace(pid, dataUrl){
+  if (typeof dataUrl !== 'string' || !dataUrl.startsWith('data:image/')) return;
+  const img = new Image();
+  img.onload = () => { const f = faceFor(pid); const g = f.c.getContext('2d'); g.clearRect(0,0,FPX,FPX); g.imageSmoothingEnabled = false; g.drawImage(img, 0, 0, FPX, FPX); f.tex.needsUpdate = true; f.real = true; f.url = dataUrl; renderLobby(); };
+  img.src = dataUrl;
+}
+const snapC = document.createElement('canvas'); snapC.width = snapC.height = FPX; // your funniest face
+
+/* ---------------- meshes ---------------- */
+function nameSprite(text, color){
+  const t = ctex(96, 16, (g,w,h) => {
+    g.font = '12px "DotGothic16","PingFang SC",sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle';
+    const tw = Math.min(w-2, g.measureText(text).width + 8);
+    g.fillStyle = '#0b0817'; g.fillRect((w-tw)/2, 1, tw, h-2); g.fillStyle = color; g.fillText(text, w/2, h/2+1);
+  });
+  const s = new THREE.Sprite(new THREE.SpriteMaterial({ map:t, depthTest:false, transparent:true })); s.scale.set(3.6, .6, 1); s.renderOrder = 10; return s;
+}
+function buildChick(faceTex){
+  const root = new THREE.Group(), body = new THREE.Group(); root.add(body);
+  const mats = [];
+  const mk = (c, x) => { const m = toon(c, x); mats.push(m); return m; };
+  const r = .8, sg = new THREE.SphereGeometry(r, 10, 7);
+  const bodyMat = mk(0xffd23f, { emissive:0x000000 });
+  const outM = OUT.clone(); mats.push(outM);
+  const b = new THREE.Mesh(sg, bodyMat), o = new THREE.Mesh(sg, outM); o.scale.setScalar(1.1); body.add(o, b); body.position.y = r;
+  const wings = [];
+  const wingMat = mk(0xffb21f);
+  for (const s of [-1,1]) { const pv = new THREE.Group(); pv.position.set(s*r*.86, 0, 0);
+    const w = new THREE.Mesh(new THREE.BoxGeometry(r*.18, r*.5, r*.8), wingMat); w.position.x = s*r*.1;
+    const wo = new THREE.Mesh(w.geometry, outM); wo.scale.setScalar(1.25); w.add(wo); pv.add(w); body.add(pv); wings.push(pv); }
+  const tuft = new THREE.Mesh(new THREE.ConeGeometry(r*.16, r*.45, 4), wingMat); tuft.position.set(0, r*1.05, 0); tuft.rotation.z = .3; body.add(tuft);
+  // muscle rig: pecs + flexing arms
+  const muscle = new THREE.Group(); muscle.visible = false; body.add(muscle);
+  const skin = mk(0xffb347), dark = mk(0xd9782a);
+  for (const s of [-1,1]) {
+    const pec = new THREE.Mesh(new THREE.BoxGeometry(r*.62, r*.4, r*.22), skin); pec.position.set(s*r*.32, -r*.05, r*.82); muscle.add(pec);
+    const po = new THREE.Mesh(pec.geometry, outM); po.scale.setScalar(1.15); pec.add(po);
+    const sh = new THREE.Group(); sh.position.set(s*r*1.0, r*.1, 0);
+    const upper = new THREE.Mesh(new THREE.BoxGeometry(r*.8, r*.34, r*.34), skin); upper.position.x = s*r*.4;
+    const bicep = new THREE.Mesh(new THREE.SphereGeometry(r*.3, 7, 5), skin); bicep.position.set(s*r*.42, r*.2, 0);
+    const elbow = new THREE.Group(); elbow.position.x = s*r*.8;
+    const fore = new THREE.Mesh(new THREE.BoxGeometry(r*.3, r*.75, r*.3), dark); fore.position.y = r*.35;
+    const fist = new THREE.Mesh(new THREE.BoxGeometry(r*.36, r*.32, r*.36), skin); fist.position.y = r*.78;
+    elbow.add(fore, fist);
+    for (const m of [upper, bicep, fore, fist]) { const mo = new THREE.Mesh(m.geometry, outM); mo.scale.setScalar(1.18); m.add(mo); }
+    sh.add(upper, bicep, elbow); muscle.add(sh);
+    sh.userData = { s, elbow };
+  }
+  const browL = new THREE.Mesh(new THREE.BoxGeometry(r*.45, r*.1, r*.1), mk(0x0b0817)); browL.position.set(-r*.3, r*.62, r*.82); browL.rotation.z = -.4; muscle.add(browL);
+  const browR = browL.clone(); browR.position.x = r*.3; browR.rotation.z = .4; muscle.add(browR);
+  const faceSpr = new THREE.Sprite(new THREE.SpriteMaterial({ map:faceTex, transparent:true })); faceSpr.scale.set(1.25, 1.25, 1); faceSpr.position.set(0, r*.15, r*.75); faceSpr.renderOrder = 2; body.add(faceSpr);
+  const shadow = new THREE.Mesh(new THREE.CircleGeometry(r, 10), new THREE.MeshBasicMaterial({ color:0, transparent:true, opacity:.35, depthWrite:false })); shadow.rotation.x = -Math.PI/2; shadow.position.y = .02; root.add(shadow);
+  const halo = new THREE.Mesh(new THREE.TorusGeometry(.5, .08, 4, 12), new THREE.MeshBasicMaterial({ color:0xfff2cf })); halo.rotation.x = Math.PI/2; halo.position.y = r*2.1; halo.visible = false; body.add(halo);
+  scene.add(root);
+  return { root, body, bodyMat, wingMat, wings, shadow, faceSpr, muscle, halo, mats, outM, tag:null, ghostA:1 };
+}
+function buildHawk(faceTex){
+  const root = new THREE.Group(), body = new THREE.Group(); root.add(body);
+  const r = .75, sg = new THREE.SphereGeometry(r, 10, 7);
+  body.add(new THREE.Mesh(sg, toon(0x8e5530))); const o = new THREE.Mesh(sg, OUT); o.scale.setScalar(1.1); body.add(o);
+  const cap = new THREE.Mesh(new THREE.SphereGeometry(r*.8, 10, 6, 0, Math.PI*2, 0, Math.PI*.45), toon(0xfff2cf)); cap.position.set(0, r*.3, r*.2); body.add(cap);
+  const beak = new THREE.Mesh(new THREE.ConeGeometry(r*.24, r*.6, 4), toon(0xffc23d)); beak.rotation.x = Math.PI/2; beak.position.set(0, -r*.25, r*1.05); body.add(beak);
+  const brows = new THREE.Group(); body.add(brows);
+  for (const s of [-1,1]) { const brow = new THREE.Mesh(new THREE.BoxGeometry(r*.4, r*.1, r*.1), toon(0x0b0817)); brow.position.set(s*r*.34, r*.5, r*.88); brow.rotation.z = s*.45; brows.add(brow); }
+  const wings = [];
+  for (const s of [-1,1]) { const pv = new THREE.Group(); pv.position.set(s*r*.8, r*.1, 0);
+    const w = new THREE.Mesh(new THREE.BoxGeometry(r*1.9, r*.14, r*.9), toon(0x5b3420)); w.position.x = s*r*.95;
+    const wo = new THREE.Mesh(w.geometry, OUT); wo.scale.set(1.06, 1.6, 1.15); w.add(wo); pv.add(w); body.add(pv); wings.push(pv); }
+  const claws = new THREE.Group(); claws.visible = false; body.add(claws);
+  for (const s of [-1,1]) { const c = new THREE.Mesh(new THREE.ConeGeometry(r*.22, r*.7, 4), toon(0xff5a3c)); c.position.set(s*r*.35, -r*.95, 0); c.rotation.x = Math.PI; claws.add(c); }
+  const faceSpr = new THREE.Sprite(new THREE.SpriteMaterial({ map:faceTex, transparent:true })); faceSpr.scale.set(1.15, 1.15, 1); faceSpr.position.set(0, r*.2, r*.72); faceSpr.renderOrder = 2; faceSpr.visible = false; body.add(faceSpr);
+  const shadow = new THREE.Mesh(new THREE.CircleGeometry(.9, 10), new THREE.MeshBasicMaterial({ color:0, transparent:true, opacity:.35, depthWrite:false })); shadow.rotation.x = -Math.PI/2; shadow.position.y = .03;
+  const ret = new THREE.Group();
+  const rr = new THREE.Mesh(new THREE.RingGeometry(1.08, 1.3, 20), new THREE.MeshBasicMaterial({ color:0xff5a3c, transparent:true, depthWrite:false, side:THREE.DoubleSide }));
+  const rd = new THREE.Mesh(new THREE.CircleGeometry(1.08, 20), new THREE.MeshBasicMaterial({ color:0xff5a3c, transparent:true, opacity:.18, depthWrite:false }));
+  rr.rotation.x = rd.rotation.x = -Math.PI/2; rr.position.y = .05; rd.position.y = .04; ret.add(rr, rd); ret.visible = false;
+  const cross = new THREE.Mesh(new THREE.RingGeometry(.5, .62, 4), new THREE.MeshBasicMaterial({ color:0xfff2cf, transparent:true, opacity:.6, depthWrite:false, side:THREE.DoubleSide }));
+  cross.rotation.x = -Math.PI/2; cross.position.y = .05; cross.visible = false;
+  scene.add(root, shadow, ret, cross);
+  return { root, body, wings, shadow, ret, rr, cross, faceSpr, claws, brows, tag:null };
+}
+const eggGeo = new THREE.SphereGeometry(.38, 8, 6);
+const eggMeshes = [0,1,2,3,4].map(() => { const m = new THREE.Mesh(eggGeo, toon(0xffe27a, { emissive:0xffb21f, emissiveIntensity:.25 })); const o = new THREE.Mesh(eggGeo, OUT); o.scale.setScalar(1.15); m.add(o); m.visible = false; scene.add(m); return m; });
+const qTex = ctex(16, 16, g => { g.fillStyle = '#ff8a3c'; g.fillRect(0,0,16,16); g.fillStyle = '#ffd23f'; g.fillRect(1,1,14,14); g.fillStyle = '#0b0817'; [[5,3],[6,3],[7,3],[8,3],[9,3],[4,4],[10,4],[10,5],[9,6],[8,7],[7,8],[7,9],[7,12],[7,13],[8,12],[8,13],[8,8],[8,9]].forEach(([x,y]) => g.fillRect(x,y,1,1)); g.fillStyle = '#ff8a3c'; g.fillRect(0,0,16,1); g.fillRect(0,15,16,1); g.fillRect(0,0,1,16); g.fillRect(15,0,1,16); });
+const itemMeshes = [0,1,2].map(() => { const m = new THREE.Mesh(new THREE.BoxGeometry(.9,.9,.9), toon(0xffffff, { map:qTex, emissive:0xff8a3c, emissiveIntensity:.2 })); const o = new THREE.Mesh(m.geometry, OUT); o.scale.setScalar(1.12); m.add(o); m.visible = false; scene.add(m); return m; });
+
+/* ---------------- audio ---------------- */
+let AC = null, master = null, recDest = null, lastBeat = 0;
+function ensureAudio(){
+  if (!AC) { try { AC = new (window.AudioContext || window.webkitAudioContext)(); master = AC.createGain(); master.gain.value = .9; master.connect(AC.destination); recDest = AC.createMediaStreamDestination(); master.connect(recDest); } catch {} }
+  if (AC && AC.state === 'suspended') AC.resume();
+}
+function tone(f, d=.1, type='square', f2=null, vol=.08, delay=0){
+  if (!AC) return;
+  const t = AC.currentTime + delay, o = AC.createOscillator(), g = AC.createGain();
+  o.type = type; o.frequency.setValueAtTime(f, t); if (f2) o.frequency.exponentialRampToValueAtTime(f2, t+d);
+  g.gain.setValueAtTime(vol, t); g.gain.exponentialRampToValueAtTime(.0001, t+d);
+  o.connect(g).connect(master); o.start(t); o.stop(t+d+.02);
+}
+function noise(d=.15, vol=.12){
+  if (!AC) return;
+  const n = Math.floor(AC.sampleRate*d), buf = AC.createBuffer(1, n, AC.sampleRate), c = buf.getChannelData(0);
+  for (let i=0;i<n;i++) c[i] = (Math.random()*2-1)*(1-i/n);
+  const s = AC.createBufferSource(), g = AC.createGain(); g.gain.value = vol; s.buffer = buf; s.connect(g).connect(master); s.start();
+}
+const SFX = {
+  hop(){ tone(420,.12,'square',980,.07); }, land(){ tone(160,.06,'triangle',90,.05); },
+  bump(){ tone(520,.09,'square',1000,.06); },
+  egg(n){ const b = 660*Math.pow(1.122, Math.min(n-1, 8)); tone(b,.07,'square',null,.07); tone(b*1.5,.09,'square',null,.06,.06); },
+  aim(){ tone(880,.08,'square',null,.05); tone(880,.08,'square',null,.05,.14); },
+  dive(){ noise(.18,.08); tone(1200,.22,'sawtooth',180,.05); },
+  impact(){ tone(110,.2,'square',50,.12); noise(.12,.1); },
+  hit(){ noise(.3,.18); tone(700,.08,'square',null,.1); tone(440,.16,'square',null,.1,.08); },
+  dodge(){ [784,988,1319].forEach((f,i) => tone(f,.07,'square',null,.07,i*.05)); },
+  near(){ tone(600,.1,'triangle',900,.06); },
+  roulette(){ for (let i=0;i<6;i++) tone(500+i*90,.05,'square',null,.05,i*.04); },
+  muscle(){ tone(90,.35,'sawtooth',60,.12); [196,247,294,392].forEach((f,i) => tone(f,.12,'square',null,.08,.1+i*.07)); },
+  punch(){ noise(.25,.2); tone(160,.3,'square',40,.14); tone(1200,.1,'square',null,.06,.05); },
+  shove(){ tone(140,.12,'square',70,.09); },
+  poof(){ noise(.2,.1); tone(900,.15,'sine',300,.05); },
+  claw(){ tone(330,.2,'sawtooth',660,.08); tone(660,.2,'sawtooth',990,.06,.1); },
+  count(){ tone(440,.12,'square',null,.08); }, go(){ tone(880,.3,'square',null,.09); },
+  win(){ [523,659,784,1046].forEach((f,i) => tone(f,.16,'square',null,.08,i*.12)); },
+  lose(){ [523,392,330,262].forEach((f,i) => tone(f,.18,'square',null,.08,i*.13)); },
+  beat(){ tone(70,.12,'sine',45,.2); },
+};
+
+/* ---------------- face tracking ---------------- */
+const face = { on:false, ok:false, nx:.5, ny:.5, cx:.5, cy:.5, jaw:0, armed:true, maxJaw:0 };
+const IS_TOUCH = matchMedia('(pointer:coarse)').matches;
+const video = document.createElement('video'); video.playsInline = true; video.muted = true; video.autoplay = true;
+video.setAttribute('playsinline', ''); video.setAttribute('muted', '');
+video.style.cssText = 'position:fixed;left:0;top:0;width:2px;height:2px;opacity:0;pointer-events:none';
+document.body.appendChild(video);
+let landmarker = null, lastVT = -1, cropTick = 0, lastDetect = 0;
+const myFaceC = document.createElement('canvas'); myFaceC.width = myFaceC.height = FPX;
+const tmpC = document.createElement('canvas'); tmpC.width = tmpC.height = 96; const tctx = tmpC.getContext('2d');
+const prevC = document.createElement('canvas'); prevC.width = 36; prevC.height = 48; const pctx = prevC.getContext('2d');
+async function startCamera(){
+  if (face.on) return;
+  const stream = await navigator.mediaDevices.getUserMedia({ video:{ facingMode:'user', width:{ ideal:IS_TOUCH ? 480 : 640 }, height:{ ideal:IS_TOUCH ? 360 : 480 } }, audio:false });
+  video.srcObject = stream; await video.play();
+  const { FaceLandmarker, FilesetResolver } = await import(`${MP}/vision_bundle.mjs`);
+  const fileset = await FilesetResolver.forVisionTasks(`${MP}/wasm`);
+  const opts = d => ({ baseOptions:{ modelAssetPath:FACE_MODEL, delegate:d }, outputFaceBlendshapes:true, runningMode:'VIDEO', numFaces:1 });
+  try { landmarker = await FaceLandmarker.createFromOptions(fileset, opts('GPU')); }
+  catch { landmarker = await FaceLandmarker.createFromOptions(fileset, opts('CPU')); }
+  face.on = true;
+}
+function pollFace(now){
+  if (!landmarker || video.readyState < 2 || video.currentTime === lastVT || now - lastDetect < (IS_TOUCH ? 40 : 28)) return;
+  lastVT = video.currentTime; lastDetect = now;
+  const r = landmarker.detectForVideo(video, now);
+  const L = r.faceLandmarks && r.faceLandmarks[0];
+  if (!L) { face.ok = false; return; }
+  face.ok = true;
+  face.nx = lerp(face.nx, L[1].x, .55); face.ny = lerp(face.ny, L[1].y, .55);
+  const jaw = (r.faceBlendshapes?.[0]?.categories || []).find(c => c.categoryName === 'jawOpen')?.score ?? 0;
+  face.jaw = lerp(face.jaw, jaw, .6);
+  if (++cropTick % 2 === 0 || jaw > face.maxJaw) cropFace(L);
+  if (W.phase === 'play' && jaw > face.maxJaw) { face.maxJaw = jaw; const s = snapC.getContext('2d'); s.clearRect(0,0,FPX,FPX); s.drawImage(myFaceC, 0, 0); }
+}
+function cropFace(L){
+  const vw = video.videoWidth, vh = video.videoHeight;
+  let x0 = 1, x1 = 0, y0 = 1, y1 = 0;
+  for (const i of [10,152,234,454,127,356,148,377,67,297]) { const p = L[i]; x0 = Math.min(x0,p.x); x1 = Math.max(x1,p.x); y0 = Math.min(y0,p.y); y1 = Math.max(y1,p.y); }
+  const cx = (x0+x1)/2*vw, cy = (y0+y1)/2*vh, size = Math.max((x1-x0)*vw, (y1-y0)*vh)*1.12;
+  tctx.save(); tctx.clearRect(0,0,96,96); tctx.translate(96,0); tctx.scale(-1,1);
+  tctx.drawImage(video, cx-size/2, cy-size/2, size, size, 0, 0, 96, 96); tctx.restore();
+  const g = myFaceC.getContext('2d'); g.clearRect(0,0,FPX,FPX); g.imageSmoothingEnabled = true; g.drawImage(tmpC, 0, 0, FPX, FPX);
+  circleMaskAndQuantize(myFaceC);
+  const f = faceFor(Net.myId); const fg = f.c.getContext('2d'); fg.clearRect(0,0,FPX,FPX); fg.drawImage(myFaceC, 0, 0); f.tex.needsUpdate = true; f.real = true;
+}
+
+/* ---------------- local input ---------------- */
+const keys = new Set();
+let pointerT = null, localHop = 0, timeScale = 1;
+const ray = new THREE.Raycaster(), plane = new THREE.Plane(new THREE.Vector3(0,1,0), 0), hitP = new THREE.Vector3();
+addEventListener('keydown', e => {
+  if (e.target.tagName === 'INPUT') return;
+  keys.add(e.code);
+  if (e.code === 'Space') { localHop++; e.preventDefault(); }
+  if (e.code === 'KeyM') timeScale = timeScale === 1 ? .25 : 1;
+  if (e.code === 'KeyC' && face.ok) { face.cx = face.nx; face.cy = face.ny; callout('已重新校准', '#53e3b7'); }
+});
+addEventListener('keyup', e => keys.delete(e.code));
+const joy = { id:null, ox:0, oy:0, x:0, y:0 };
+function joyEnd(e){ if (e.pointerId !== joy.id) return; joy.id = null; joy.x = joy.y = 0; $('#joy').hidden = true; }
+out.addEventListener('pointerdown', e => {
+  ensureAudio();
+  if (e.pointerType === 'touch' || e.pointerType === 'pen') {
+    if (joy.id !== null) return;
+    out.setPointerCapture(e.pointerId);
+    const r = $('#frame').getBoundingClientRect();
+    joy.id = e.pointerId; joy.ox = e.clientX; joy.oy = e.clientY; joy.x = joy.y = 0;
+    const j = $('#joy'); j.style.left = (e.clientX - r.left) + 'px'; j.style.top = (e.clientY - r.top) + 'px'; j.hidden = false; j.firstElementChild.style.transform = '';
+    return;
+  }
+  setPointer(e); if (!face.on) localHop++;
+});
+out.addEventListener('pointermove', e => {
+  if (e.pointerId === joy.id) {
+    const r = $('#frame').getBoundingClientRect(), m = r.width*.11;
+    let dx = e.clientX - joy.ox, dy = e.clientY - joy.oy; const l = Math.hypot(dx, dy); if (l > m) { dx *= m/l; dy *= m/l; }
+    joy.x = dx/m; joy.y = dy/m; $('#joy').firstElementChild.style.transform = `translate(${dx}px,${dy}px)`;
+    return;
+  }
+  setPointer(e);
+});
+out.addEventListener('pointerup', joyEnd); out.addEventListener('pointercancel', joyEnd); out.addEventListener('lostpointercapture', joyEnd);
+$('#jumpBtn').addEventListener('pointerdown', e => { e.preventDefault(); ensureAudio(); localHop++; if (navigator.vibrate) try { navigator.vibrate(15); } catch {} });
+function setPointer(e){
+  if (face.on) return;
+  const r = out.getBoundingClientRect();
+  ray.setFromCamera({ x:(e.clientX-r.left)/r.width*2-1, y:-((e.clientY-r.top)/r.height*2-1) }, camera);
+  if (ray.ray.intersectPlane(plane, hitP)) pointerT = [hitP.x, hitP.z];
+}
+function localTarget(){
+  const me = W.ents.find(e => e.pid === Net.myId && e.k !== 2);
+  const mx = me ? me.x : 0, mz = me ? me.z : 2;
+  if (joy.id !== null && (joy.x || joy.y)) return [clamp(mx + joy.x*4.5, -HW+.8, HW-.8), clamp(mz + joy.y*4.5, -HL+.8, HL-.8)];
+  if (face.on) {
+    if (!face.ok) return [mx, mz];
+    // 摇杆式：头偏离校准中心的方向 = 移动方向，偏得越多跑得越快
+    let jx = (face.cx - face.nx)/.075, jz = (face.ny - face.cy)/.055;
+    const m = len(jx, jz), dead = .18;
+    if (m < dead) { jx = 0; jz = 0; } else { const k = Math.min(1, (m - dead)/(1 - dead))/m; jx *= k; jz *= k; }
+    return [clamp(mx + jx*4.5, -HW+.8, HW-.8), clamp(mz + jz*4.5, -HL+.8, HL-.8)];
+  }
+  let x = 0, z = 0;
+  if (keys.has('KeyA') || keys.has('ArrowLeft')) x -= 1; if (keys.has('KeyD') || keys.has('ArrowRight')) x += 1;
+  if (keys.has('KeyW') || keys.has('ArrowUp')) z -= 1; if (keys.has('KeyS') || keys.has('ArrowDown')) z += 1;
+  if (x || z) { pointerT = null; return [clamp(mx + x*2.5, -HW+.8, HW-.8), clamp(mz + z*2.5, -HL+.8, HL-.8)]; }
+  return pointerT ? [clamp(pointerT[0], -HW+.8, HW-.8), clamp(pointerT[1], -HL+.8, HL-.8)] : [mx, mz];
+}
+
+/* =====================================================================
+   NETWORK — host-authoritative star. PeerJS (internet) or BroadcastChannel (?local)
+   ===================================================================== */
+const Net = { role:'none', myId:'me', code:'', conns:new Map(), toHost:null, bc:null, peer:null, lobbyResolve:null, lastHost:0, hostId:'' };
+const players = new Map(); // host only: pid -> {pid,name,ix,iz,hop,hopSeen,last,face}
+let lobbyList = [];        // everyone: [[pid,name]]
+function loadPeer(){ return window.Peer ? Promise.resolve() : new Promise((res, rej) => { const s = document.createElement('script'); s.src = PEERJS; s.onload = res; s.onerror = () => rej(new Error('peerjs')); document.head.appendChild(s); }); }
+function newCode(){ const a = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; return Array.from({length:4}, () => a[Math.floor(Math.random()*a.length)]).join(''); }
+const myName = () => ($('#nick').value.trim() || '弹弹玩家').slice(0, 8);
+
+async function netHost(){
+  for (let attempt = 0; attempt < 4; attempt++) {
+    const code = newCode();
+    try { await openHost(code); Net.code = code; return; }
+    catch (err) { if (err && err.type === 'unavailable-id') continue; throw err; }
+  }
+  throw new Error('no-code');
+}
+async function openHost(code){
+  Net.role = 'host';
+  if (LOCAL) {
+    Net.myId = 'host'; Net.bc = new BroadcastChannel('bflock-' + code);
+    Net.bc.onmessage = e => { const d = e.data; if (!d || d.to !== 'host') return;
+      if (!Net.conns.has(d.from)) Net.conns.set(d.from, { send:m => Net.bc.postMessage({ from:'host', to:d.from, m }) });
+      hostRecv(d.from, d.m); };
+    return;
+  }
+  await loadPeer();
+  const peer = new Peer('bflock-' + code.toLowerCase(), { debug:1 });
+  await new Promise((res, rej) => { peer.once('open', id => { Net.myId = id; res(); }); peer.once('error', rej); });
+  Net.peer = peer;
+  peer.on('connection', c => {
+    Net.conns.set(c.peer, { send:m => { if (c.open) c.send(m); } });
+    c.on('data', m => hostRecv(c.peer, m));
+    c.on('close', () => hostDrop(c.peer)); c.on('error', () => hostDrop(c.peer));
+  });
+  peer.on('disconnected', () => { try { peer.reconnect(); } catch {} });
+}
+async function netJoin(code){
+  Net.role = 'client'; Net.code = code;
+  const gotLobby = new Promise((res, rej) => { Net.lobbyResolve = res; setTimeout(() => rej(new Error('notfound')), LOCAL ? 3000 : 12000); });
+  if (LOCAL) {
+    Net.myId = 'p' + Math.random().toString(36).slice(2, 8);
+    Net.bc = new BroadcastChannel('bflock-' + code);
+    Net.bc.onmessage = e => { const d = e.data; if (d && d.from === 'host' && (d.to === Net.myId || d.to === '*')) clientRecv(d.m); };
+    Net.toHost = m => Net.bc.postMessage({ from:Net.myId, to:'host', m });
+  } else {
+    await loadPeer();
+    const peer = new Peer({ debug:1 }); Net.peer = peer;
+    await new Promise((res, rej) => { peer.once('open', id => { Net.myId = id; res(); }); peer.once('error', rej); });
+    const c = peer.connect('bflock-' + code.toLowerCase(), { reliable:true, serialization:'json' });
+    await new Promise((res, rej) => { const to = setTimeout(() => rej(new Error('notfound')), 10000); c.on('open', () => { clearTimeout(to); res(); }); peer.on('error', e => { clearTimeout(to); rej(e); }); });
+    Net.toHost = m => { if (c.open) c.send(m); };
+    c.on('data', clientRecv); c.on('close', hostGone);
+  }
+  Net.toHost({ t:'hello', name:myName() });
+  await gotLobby;
+}
+function netLeave(){
+  try { if (Net.role === 'client' && Net.toHost) Net.toHost({ t:'bye' }); } catch {}
+  try { Net.bc && Net.bc.close(); } catch {}
+  try { Net.peer && Net.peer.destroy(); } catch {}
+  Object.assign(Net, { role:'none', myId:'me', code:'', conns:new Map(), toHost:null, bc:null, peer:null });
+  players.clear(); lobbyList = [];
+}
+function broadcast(m){
+  if (Net.role !== 'host') return;
+  if (LOCAL) { Net.bc && Net.bc.postMessage({ from:'host', to:'*', m }); return; }
+  for (const c of Net.conns.values()) c.send(m);
+}
+function sendTo(pid, m){ const c = Net.conns.get(pid); if (c) c.send(m); }
+
+// host side
+function hostRecv(pid, m){
+  if (!m || typeof m !== 'object') return;
+  let p = players.get(pid);
+  if (m.t === 'hello') {
+    if (!p && players.size >= 5) return;
+    if (!p) { p = { pid, name:'', ix:0, iz:2, hop:0, hopSeen:0, last:performance.now(), face:null }; players.set(pid, p); }
+    p.name = String(m.name || '玩家').slice(0, 8);
+    broadcastLobby();
+    for (const q of players.values()) if (q.face) sendTo(pid, { t:'face', pid:q.pid, d:q.face });
+    return;
+  }
+  if (!p) return;
+  p.last = performance.now();
+  if (m.t === 'in') { p.ix = clamp(+m.x || 0, -HW, HW); p.iz = clamp(+m.z || 0, -HL, HL); const h = +m.h || 0; if (p.hopSeen === -1) p.hopSeen = h; p.hop = h; }
+  else if (m.t === 'face' && typeof m.d === 'string' && m.d.length < 6000) { p.face = m.d; setRemoteFace(pid, m.d); broadcast({ t:'face', pid, d:m.d }); }
+  else if (m.t === 'bye') hostDrop(pid);
+}
+function hostDrop(pid){
+  if (!players.has(pid) || pid === Net.myId) return;
+  players.delete(pid); Net.conns.delete(pid);
+  for (const e of S.ents) if (e.pid === pid) { e.name += '(掉线)'; e.pid = null; }
+  broadcastLobby();
+}
+function broadcastLobby(){
+  lobbyList = [...players.values()].map(p => [p.pid, p.name]);
+  broadcast({ t:'lobby', code:Net.code, host:Net.myId, players:lobbyList });
+  renderLobby();
+}
+// client side
+function clientRecv(m){
+  if (!m || typeof m !== 'object') return;
+  Net.lastHost = performance.now();
+  if (m.t === 'lobby') {
+    lobbyList = Array.isArray(m.players) ? m.players.slice(0, 5).map(([a,b]) => [String(a), String(b).slice(0,8)]) : [];
+    Net.hostId = String(m.host || '');
+    if (Net.lobbyResolve) { Net.lobbyResolve(); Net.lobbyResolve = null; }
+    renderLobby();
+  } else if (m.t === 'face') setRemoteFace(String(m.pid), m.d);
+  else if (m.t === 'snap') applySnap(m, false);
+}
+function hostGone(){ if (Net.role !== 'client') return; netLeave(); toMenu('房主离开了房间。'); }
+
+/* =====================================================================
+   SIMULATION (host / solo only)
+   ===================================================================== */
+const S = { phase:'lobby', t:0, countT:0, endT:0, round:0, ents:[], items:[], eggs:[], evq:[], evSeq:0, nextId:1, hbT:0, itemT:2, res:null, slow:0 };
+function ev(type, x=0, z=0, a=0, s=''){ const seq = ++S.evSeq; S.evq.push([seq, type, r2(x), r2(z), a, s]); if (S.evq.length > 30) S.evq.shift(); fx(type, x, z, a, s); }
+function mkEnt(kind, pid, name){
+  return { id:S.nextId++, kind, pid, name, x:0, z:0, y:kind==='hawk'?MOTION.hawkHeight:0, vx:0, vz:0, vy:0, air:false, hopCd:0, sq:0, sqv:0,
+    hearts:GAME.hearts, out:false, inv:0, knock:0, buff:'', buffT:0, life:0, ang:rnd(0,6.3),
+    state:'fly', t:0, tx:0, tz:0, sy:MOTION.hawkHeight, cd:1.5, stun:0, hb:'', hbN:0, aimDur:MOTION.hawkAim, react:0, aiT:rnd(1,2),
+    st:{ eggs:0, dodges:0, catches:0, hits:0, punches:0, alive:0, score:0 } };
+}
+const hawkEnt = () => S.ents.find(e => e.kind === 'hawk');
+function startRound(){
+  const humans = [...players.values()];
+  S.round++;
+  const hawkP = humans.length >= 2 ? humans[(S.round-1) % humans.length] : null;
+  Object.assign(S, { phase:'count', countT:3.4, t:0, endT:0, ents:[], items:[], evq:[], nextId:1, hbT:GAME.hawkBuffEvery, itemT:2.5, res:null, slow:0 });
+  const hawk = mkEnt('hawk', hawkP ? hawkP.pid : null, hawkP ? hawkP.name : '电脑老鹰');
+  hawk.x = 0; hawk.z = -8; hawk.tx = 0; hawk.tz = -8; S.ents.push(hawk);
+  const chickPs = humans.filter(p => p !== hawkP);
+  const n = Math.max(GAME.minChicks, chickPs.length), ai = ['小黄','小绒','小豆','小米'];
+  for (let i=0;i<n;i++) {
+    const p = chickPs[i]; const e = mkEnt('chick', p ? p.pid : null, p ? p.name : ai[i % ai.length]);
+    e.x = (i - (n-1)/2)*2.4; e.z = 9.5; S.ents.push(e);
+  }
+  for (const p of humans) { p.hopSeen = -1; }
+  S.eggs = Array.from({length:GAME.eggs}, () => 0).map(() => ({ alive:false, t:rnd(.5,1.5), x:0, z:0, born:0 }));
+  S.ents.forEach(e => e.st.score = 0);
+}
+function inputFor(e){
+  if (!e.pid) return null;
+  if (e.pid === Net.myId) { const [x, z] = localTarget(); const hop = localHop > (e.hopSeenLocal ?? localHop); e.hopSeenLocal = localHop; return { x, z, hop }; }
+  const p = players.get(e.pid); if (!p) return null;
+  const hop = p.hopSeen !== -1 && p.hop > p.hopSeen; p.hopSeen = p.hop;
+  return { x:p.ix, z:p.iz, hop };
+}
+function freeSpot(minD=2.5){
+  for (let k=0;k<40;k++) {
+    const x = rnd(-HW+1, HW-1), z = rnd(-HL+1, HL-1);
+    if (BUMPERS.some(b => len(b.x-x, b.z-z) < 1.8)) continue;
+    if (S.ents.some(e => e.kind !== 'hawk' && len(e.x-x, e.z-z) < minD)) continue;
+    if (S.items.some(i => len(i.x-x, i.z-z) < 2)) continue;
+    if (S.eggs.some(g => g.alive && len(g.x-x, g.z-z) < 1.6)) continue;
+    return [x, z];
+  }
+  return [rnd(-HW+1, HW-1), rnd(-HL+1, HL-1)];
+}
+function aiChick(e){
+  const h = hawkEnt(); let tx = e.x, tz = e.z, hop = false;
+  if (e.kind === 'decoy') { e.ang += rnd(-.3,.3); return [clamp(e.x + Math.cos(e.ang)*3, -HW+1, HW-1), clamp(e.z + Math.sin(e.ang)*3, -HL+1, HL-1), Math.random() < .01]; }
+  if (h && (h.state === 'aim' || h.state === 'dive') && S.t - (h.aimAt || 0) > e.react) {
+    const d = len(e.x-h.tx, e.z-h.tz) || .01;
+    if (d < 2.6) { const k = 3.2; tx = e.x + (e.x-h.tx)/d*k; tz = e.z + (e.z-h.tz)/d*k; if (h.state === 'dive' && d < 1.4 && Math.random() < .6) hop = true;
+      return [clamp(tx, -HW+.8, HW-.8), clamp(tz, -HL+.8, HL-.8), hop]; }
+  }
+  let best = null, bd = 1e9;
+  for (const i of S.items) { const d = len(i.x-e.x, i.z-e.z)*.8; if (d < bd) { bd = d; best = i; } }
+  for (const g of S.eggs) if (g.alive) { const d = len(g.x-e.x, g.z-e.z); if (d < bd) { bd = d; best = g; } }
+  if (best) { tx = best.x; tz = best.z; }
+  if (h) { const d = len(e.x-h.x, e.z-h.z) || .01; if (d < 3) { tx += (e.x-h.x)/d*2.5; tz += (e.z-h.z)/d*2.5; } }
+  tx += Math.sin(S.t*1.3 + e.id)*.8; tz += Math.cos(S.t*1.1 + e.id)*.8;
+  return [clamp(tx, -HW+.8, HW-.8), clamp(tz, -HL+.8, HL-.8), false];
+}
+function stepChick(e, dt){
+  e.hopCd = Math.max(0, e.hopCd-dt); e.inv = Math.max(0, e.inv-dt); e.knock = Math.max(0, e.knock-dt);
+  if (e.buffT > 0) { e.buffT -= dt; if (e.buffT <= 0) { e.buffT = 0; e.buff = ''; } }
+  if (e.kind === 'decoy') { e.life -= dt; if (e.life <= 0) { e.dead = true; ev('poof', e.x, e.z); return; } }
+  if (!e.out && S.phase === 'play' && e.kind === 'chick') e.st.alive += dt;
+  const inp = inputFor(e);
+  let tx, tz, hop;
+  if (inp) { tx = inp.x; tz = inp.z; hop = inp.hop; } else [tx, tz, hop] = aiChick(e);
+  if (S.phase !== 'play' && S.phase !== 'end') hop = false;
+  const muscle = e.buff === 'muscle', speed = e.buff === 'speed';
+  let k = e.knock > 0 ? 6 : speed ? 70 : muscle ? 32 : 42, c = e.knock > 0 ? 1.5 : speed ? 11 : 9.5, cap = speed ? 21 : muscle ? 12 : 15;
+  if (e.out) { k = 18; c = 6; cap = 9; }
+  e.vx += ((tx-e.x)*k - e.vx*c)*dt; e.vz += ((tz-e.z)*k - e.vz*c)*dt;
+  const sp = len(e.vx, e.vz); if (sp > cap) { e.vx *= cap/sp; e.vz *= cap/sp; }
+  e.x += e.vx*dt; e.z += e.vz*dt;
+  const r = rad(e);
+  if (e.x < -HW+r) { e.x = -HW+r; e.vx = Math.abs(e.vx)*.7; } if (e.x > HW-r) { e.x = HW-r; e.vx = -Math.abs(e.vx)*.7; }
+  if (e.z < -HL+r) { e.z = -HL+r; e.vz = Math.abs(e.vz)*.7; } if (e.z > HL-r) { e.z = HL-r; e.vz = -Math.abs(e.vz)*.7; }
+  if (!e.out && e.y < .6) for (const b of BUMPERS) {
+    const dx = e.x-b.x, dz = e.z-b.z, d = len(dx,dz), rr = b.r + r;
+    if (d < rr && d > 1e-4) {
+      const nx = dx/d, nz = dz/d; e.x = b.x + nx*rr; e.z = b.z + nz*rr;
+      const vn = e.vx*nx + e.vz*nz; if (vn < 0) { e.vx -= 2*vn*nx; e.vz -= 2*vn*nz; }
+      e.vx += nx*11; e.vz += nz*11; e.knock = .28; e.sq = .45;
+      ev('bump', b.x+nx*b.r, b.z+nz*b.r, b.i);
+    }
+  }
+  if (hop && !e.out && !e.air && e.hopCd <= 0) { e.vy = MOTION.hopVelocity * (muscle ? .85 : 1); e.air = true; e.sq = MOTION.takeoffStretch; e.sqv = 0; ev('hop', e.x, e.z, 0, e.pid || ''); }
+  if (e.air) {
+    e.vy -= MOTION.gravity*dt; e.y += e.vy*dt;
+    if (e.y <= 0) { e.y = 0; e.air = false; e.vy = 0; e.sq = MOTION.landSquash*(muscle ? 1.3 : 1); e.sqv = 0; e.hopCd = .12;
+      if (muscle) { ev('stomp', e.x, e.z); for (const o of S.ents) if (o !== e && o.kind !== 'hawk' && !o.out && len(o.x-e.x, o.z-e.z) < 2.6) { const d = len(o.x-e.x, o.z-e.z) || .1; o.vx += (o.x-e.x)/d*12; o.vz += (o.z-e.z)/d*12; o.knock = .35; } } }
+  }
+  if (e.out) e.y = lerp(e.y, 1.1 + Math.sin(S.t*3 + e.id)*.2, Math.min(1, dt*4));
+  e.sqv += (-e.sq*MOTION.squashSpring - e.sqv*MOTION.squashDamp)*dt; e.sq += e.sqv*dt;
+}
+const rad = e => e.kind === 'hawk' ? .75 : (e.buff === 'muscle' ? .8*MOTION.muscleScale : .8);
+function stepHawk(h, dt){
+  h.t -= dt; h.cd = Math.max(0, h.cd-dt); h.stun = Math.max(0, h.stun-dt);
+  const inp = inputFor(h);
+  let tx, tz, hop = false;
+  if (inp) { tx = inp.x; tz = inp.z; hop = inp.hop; }
+  else {
+    const prey = S.ents.filter(e => e.kind !== 'hawk' && !e.out);
+    let t = null, bd = 1e9; for (const p of prey) { const d = len(p.x-h.x, p.z-h.z) + (p.buff === 'muscle' ? 8 : 0) + (p.buff === 'ghost' ? 5 : 0); if (d < bd) { bd = d; t = p; } }
+    if (t) { tx = t.x + t.vx*.3 + Math.sin(S.t*1.7)*.6; tz = t.z + t.vz*.3; h.aiT -= dt; if (h.aiT <= 0 && len(t.x-h.x, t.z-h.z) < 2.2) { hop = true; h.aiT = rnd(.8, 1.8) * (1 - clamp(S.t/GAME.dur,0,1)*.4); } }
+    else { tx = Math.cos(S.t*.7)*3; tz = Math.sin(S.t*.7)*4; }
+  }
+  if (S.phase !== 'play') hop = false;
+  tx = clamp(tx ?? h.x, -HW+.6, HW-.6); tz = clamp(tz ?? h.z, -HL+.6, HL-.6);
+  if (h.state === 'fly') {
+    if (h.stun > 0) { h.vx *= .9; h.vz *= .9; }
+    else { h.vx += ((tx-h.x)*16 - h.vx*6.5)*dt; h.vz += ((tz-h.z)*16 - h.vz*6.5)*dt; }
+    const sp = len(h.vx, h.vz), cap = MOTION.hawkFly; if (sp > cap) { h.vx *= cap/sp; h.vz *= cap/sp; }
+    h.x += h.vx*dt; h.z += h.vz*dt; h.y = lerp(h.y, MOTION.hawkHeight + Math.sin(S.t*2)*.25, Math.min(1, dt*5));
+    if (hop && h.cd <= 0 && h.stun <= 0) {
+      h.state = 'aim'; h.aimDur = h.hb === 'quick' ? MOTION.hawkAimQuick : MOTION.hawkAim; h.t = h.aimDur; h.tx = h.x; h.tz = h.z; h.aimAt = S.t;
+      for (const e of S.ents) e.react = rnd(.12, .45);
+      ev('aim', h.x, h.z);
+    }
+  } else if (h.state === 'aim') {
+    const dx = tx - h.tx, dz = tz - h.tz, d = len(dx, dz), step = MOTION.hawkRetSpeed*dt*(inp ? 1 : .6);
+    if (d > step) { h.tx += dx/d*step; h.tz += dz/d*step; } else { h.tx = tx; h.tz = tz; }
+    h.x = lerp(h.x, h.tx, Math.min(1, dt*10)); h.z = lerp(h.z, h.tz, Math.min(1, dt*10)); h.vx = h.vz = 0;
+    h.y = MOTION.hawkHeight + (1 - h.t/h.aimDur)*1.3;
+    if (h.t <= 0) { h.state = 'dive'; h.t = MOTION.hawkDive; h.sy = h.y; ev('dive', h.tx, h.tz); }
+  } else if (h.state === 'dive') {
+    const p = clamp(1 - h.t/MOTION.hawkDive, 0, 1); h.x = h.tx; h.z = h.tz; h.y = lerp(h.sy, .7, easeInCubic(p));
+    if (h.t <= 0) { impact(h); if (h.state === 'dive') { h.state = 'rise'; h.t = MOTION.hawkRise; } }
+  } else if (h.state === 'rise') {
+    const p = clamp(1 - h.t/MOTION.hawkRise, 0, 1); h.y = lerp(.7, MOTION.hawkHeight, easeOutCubic(p));
+    if (h.stun > 0) { h.x += h.vx*dt; h.z += h.vz*dt; h.vx *= .95; h.vz *= .95; h.x = clamp(h.x, -HW+.6, HW-.6); h.z = clamp(h.z, -HL+.6, HL-.6); }
+    if (h.t <= 0) { h.state = 'fly'; h.cd = MOTION.hawkCd; }
+  }
+}
+function impact(h){
+  ev('impact', h.tx, h.tz);
+  const claw = h.hb === 'claw', R = MOTION.hitRadius*(claw ? MOTION.clawMul : 1);
+  if (h.hbN > 0) { h.hbN--; if (h.hbN <= 0) h.hb = ''; }
+  if (S.phase !== 'play') return;
+  let punched = false;
+  for (const e of S.ents) {
+    if (e.kind === 'hawk' || e.out || e.dead) continue;
+    const d = len(e.x-h.tx, e.z-h.tz);
+    if (d >= R) { if (e.kind === 'chick' && d < MOTION.nearRadius + (claw ? .8 : 0) && e.inv <= 0) { e.st.score += 3; ev('near', e.x, e.z, 3, e.pid || ''); } continue; }
+    if (e.kind === 'decoy') { e.dead = true; h.stun = Math.max(h.stun, MOTION.fakeStun); ev('fake', e.x, e.z, 0, h.pid || ''); continue; }
+    if (e.buff === 'muscle') {
+      punched = true; e.st.punches++; e.st.score += GAME.punchPts;
+      const dd = d || .1; h.vx = (h.tx-e.x)/dd*14 || 10; h.vz = (h.tz-e.z)/dd*14; h.stun = MOTION.punchStun;
+      S.slow = MOTION.hitSlowmo; ev('punch', e.x, e.z, 0, (e.pid || '') + '|' + e.name);
+      continue;
+    }
+    if (e.y > .35) { e.st.dodges++; e.st.score += GAME.dodgePts; ev('dodge', e.x, e.z, GAME.dodgePts, e.pid || ''); continue; }
+    if (e.inv > 0) continue;
+    e.hearts--; e.inv = 1.4; e.knock = .45; const dd = d || .1; e.vx = (e.x-h.tx)/dd*12; e.vz = (e.z-h.tz)/dd*12; e.sq = .7;
+    h.st.hits++; h.st.score += GAME.hitPts; S.slow = MOTION.hitSlowmo;
+    if (e.hearts <= 0) { e.out = true; e.buff = ''; e.buffT = 0; h.st.catches++; h.st.score += GAME.catchPts; ev('out', e.x, e.z, 0, (e.pid || '') + '|' + e.name); }
+    else ev('hit', e.x, e.z, e.hearts, (e.pid || '') + '|' + e.name);
+  }
+  if (punched) { h.state = 'rise'; h.t = MOTION.hawkRise*1.4; }
+  if (!S.ents.some(e => e.kind === 'chick' && !e.out)) endRound('hawk');
+}
+function collideChicks(){
+  const list = S.ents.filter(e => e.kind !== 'hawk' && !e.out && !e.dead && e.y < .8);
+  for (let i=0;i<list.length;i++) for (let j=i+1;j<list.length;j++) {
+    const a = list[i], b = list[j], dx = a.x-b.x, dz = a.z-b.z, d = len(dx,dz), rr = rad(a)+rad(b);
+    if (d >= rr || d < 1e-4) continue;
+    const nx = dx/d, nz = dz/d, ma = a.buff === 'muscle' ? 5 : 1, mb = b.buff === 'muscle' ? 5 : 1, over = rr-d;
+    a.x += nx*over*mb/(ma+mb); a.z += nz*over*mb/(ma+mb); b.x -= nx*over*ma/(ma+mb); b.z -= nz*over*ma/(ma+mb);
+    const vn = (a.vx-b.vx)*nx + (a.vz-b.vz)*nz;
+    if (vn < 0) { const j2 = -1.9*vn/(1/ma+1/mb); a.vx += j2/ma*nx; a.vz += j2/ma*nz; b.vx -= j2/mb*nx; b.vz -= j2/mb*nz; }
+    if (ma !== mb) { const weak = ma < mb ? a : b, s = ma < mb ? 1 : -1; weak.vx += nx*s*9; weak.vz += nz*s*9; weak.knock = .35; if (Math.random() < .5) ev('shove', (a.x+b.x)/2, (a.z+b.z)/2); }
+    a.sq = Math.max(a.sq, .3); b.sq = Math.max(b.sq, .3);
+  }
+}
+function stepPickups(dt){
+  for (const g of S.eggs) {
+    if (!g.alive) { g.t -= dt; if (g.t <= 0) { [g.x, g.z] = freeSpot(); g.alive = true; g.born = S.t; } continue; }
+    const e = S.ents.find(e => e.kind === 'chick' && !e.out && e.y < 1.2 && len(e.x-g.x, e.z-g.z) < 1.05);
+    if (e) { g.alive = false; g.t = rnd(.6, 1.6); e.st.eggs++; e.combo = S.t - (e.lastEgg ?? -9) < 2.5 ? Math.min(4, (e.combo || 1)+1) : 1; e.lastEgg = S.t;
+      const pts = GAME.eggPts*e.combo; e.st.score += pts; ev('egg', g.x, g.z, pts, (e.pid || '') + '|' + e.combo); e.sq = .3; }
+  }
+  S.itemT -= dt;
+  if (S.itemT <= 0 && S.items.length < GAME.maxItems) { const [x, z] = freeSpot(3); S.items.push({ id:S.nextId++, x, z, born:S.t }); S.itemT = GAME.itemEvery; }
+  for (let i=S.items.length-1;i>=0;i--) {
+    const it = S.items[i];
+    const e = S.ents.find(e => e.kind === 'chick' && !e.out && e.y < 1.3 && len(e.x-it.x, e.z-it.z) < 1.15);
+    if (!e) continue;
+    S.items.splice(i, 1); S.itemT = Math.max(S.itemT, 2);
+    let r = Math.random(), type = BUFF_KEYS[0]; for (const k of BUFF_KEYS) { if (r < BUFFS[k].w) { type = k; break; } r -= BUFFS[k].w; }
+    if (type === 'decoy') {
+      for (let k=0;k<2;k++) { const d = mkEnt('decoy', e.pid, e.name); d.x = e.x + (k ? 1 : -1); d.z = e.z; d.vx = (k ? 6 : -6); d.vz = rnd(-4,4); d.life = BUFFS.decoy.dur; d.faceKey = e.pid || ('ai' + e.id); S.ents.push(d); }
+      e.buff = 'decoy'; e.buffT = 1.2;
+    } else { e.buff = type; e.buffT = BUFFS[type].dur; }
+    ev('buff', it.x, it.z, BUFF_KEYS.indexOf(type), (e.pid || '') + '|' + e.name);
+  }
+}
+function hostStep(dt){
+  if (S.phase === 'count') {
+    S.countT -= dt;
+    for (const e of S.ents) if (e.kind === 'hawk') stepHawk(e, dt); else stepChick(e, dt);
+    if (S.countT <= -.3) S.phase = 'play';
+    return;
+  }
+  if (S.phase !== 'play' && S.phase !== 'end') return;
+  if (S.phase === 'play') {
+    S.t += dt;
+    S.hbT -= dt;
+    const h = hawkEnt();
+    if (S.hbT <= 0 && h) { S.hbT = GAME.hawkBuffEvery; h.hb = HB_KEYS[Math.floor(Math.random()*HB_KEYS.length)]; h.hbN = 2; ev('hbuff', h.x, h.z, HB_KEYS.indexOf(h.hb), h.pid || ''); }
+    stepPickups(dt);
+  } else S.endT += dt;
+  for (const e of S.ents) if (e.kind === 'hawk') stepHawk(e, dt); else stepChick(e, dt);
+  collideChicks();
+  S.ents = S.ents.filter(e => !e.dead);
+  if (S.phase === 'play' && S.t >= GAME.dur) endRound('chicks');
+}
+function endRound(win){
+  if (S.phase !== 'play') return;
+  S.phase = 'end'; S.endT = 0;
+  const rows = [];
+  for (const e of S.ents) {
+    if (e.kind === 'decoy') continue;
+    let line, score = Math.round(e.st.score);
+    if (e.kind === 'hawk') line = `抓到 ${e.st.catches} · 啄中 ${e.st.hits}`;
+    else { score += Math.round(e.st.alive)*(e.out ? 1 : 2); line = `${e.out ? '被抓' : '存活'} · 金蛋 ${e.st.eggs} · 闪避 ${e.st.dodges}${e.st.punches ? ` · 打飞 ${e.st.punches}` : ''}`; }
+    rows.push([e.pid || '', e.name, e.kind === 'hawk' ? 1 : 0, score, line, e.pid ? '' : 'ai' + e.id]);
+  }
+  let mvp = 0; rows.forEach((r, i) => { if (r[3] > rows[mvp][3]) mvp = i; });
+  S.res = { win, rows, mvp };
+  ev('win', 0, 0, win === 'hawk' ? 1 : 0);
+}
+const KIND = { chick:0, hawk:1, decoy:2 }, HST = { fly:0, aim:1, dive:2, rise:3 };
+function buildSnap(){
+  return { t:'snap', ph:S.phase, tm:r2(Math.max(0, GAME.dur - S.t)), ct:r2(S.countT), rd:S.round, et:r2(S.endT),
+    e:S.ents.map(e => [e.id, KIND[e.kind], e.pid || '', e.name, r2(e.x), r2(e.z), r2(e.y),
+      (e.out?1:0)|(e.air?2:0)|(e.inv>0?4:0)|(e.stun>0?8:0)|(e.hb==='claw'?16:0)|(e.hb==='quick'?32:0),
+      e.hearts, e.buff ? BUFF_KEYS.indexOf(e.buff)+1 : 0, r2(e.buffT), HST[e.state] || 0, r2(e.tx), r2(e.tz),
+      e.state === 'aim' ? r2(1 - e.t/e.aimDur) : 0, r2(e.sq), r2(e.vx), r2(e.vz), r2(e.cd), e.faceKey || (e.pid ? '' : 'ai' + e.id), Math.round(e.st.score)]),
+    it:S.items.map(i => [i.id, r2(i.x), r2(i.z)]),
+    eg:S.eggs.filter(g => g.alive).map(g => [r2(g.x), r2(g.z)]),
+    ev:S.evq.slice(-16), res:S.res };
+}
+
+/* =====================================================================
+   WORLD VIEW (everyone renders from snapshots)
+   ===================================================================== */
+const W = { phase:'idle', tm:GAME.dur, ct:0, rd:0, et:0, ents:[], items:[], eggs:[], res:null, evSeen:-1 };
+const views = new Map();
+function applySnap(sn, local){
+  const prevPhase = W.phase;
+  W.phase = ['lobby','count','play','end'].includes(sn.ph) ? sn.ph : 'lobby';
+  W.tm = +sn.tm || 0; W.ct = +sn.ct || 0; W.et = +sn.et || 0;
+  const roundChanged = sn.rd !== W.rd; W.rd = sn.rd;
+  W.items = Array.isArray(sn.it) ? sn.it : []; W.eggs = Array.isArray(sn.eg) ? sn.eg : [];
+  W.res = sn.res || null;
+  const seen = new Set();
+  W.ents = (Array.isArray(sn.e) ? sn.e : []).map(a => {
+    const [id, k, pid, name, x, z, y, fl, hearts, bf, bt, st, tx, tz, ap, sq, vx, vz, cd, fk, score] = a;
+    seen.add(id);
+    let v = views.get(id);
+    if (!v || roundChanged && !local) {
+      if (v) disposeView(v);
+      v = makeView(id, +k, String(pid), String(name).slice(0, 12), String(fk || pid || ''));
+      v.dx = +x; v.dz = +z; v.dy = +y; views.set(id, v);
+    }
+    Object.assign(v, { x:+x, z:+z, y:+y, out:!!(fl&1), air:!!(fl&2), inv:!!(fl&4), stun:!!(fl&8), claw:!!(fl&16), quick:!!(fl&32),
+      hearts:+hearts, buff:bf ? BUFF_KEYS[bf-1] : '', buffT:+bt, state:['fly','aim','dive','rise'][st] || 'fly', tx:+tx, tz:+tz, aimP:+ap, sq:+sq, vx:+vx, vz:+vz, cd:+cd, score:+score, name:String(name).slice(0,12) });
+    if (local) { v.dx = v.x; v.dz = v.z; v.dy = v.y; }
+    return v;
+  });
+  for (const [id, v] of views) if (!seen.has(id)) { disposeView(v); views.delete(id); }
+  if (!local && Array.isArray(sn.ev)) {
+    const maxSeq = sn.ev.reduce((m, e) => Math.max(m, +e[0] || 0), 0);
+    if (W.evSeen < 0 || roundChanged) W.evSeen = Math.max(W.evSeen, maxSeq - (roundChanged ? 0 : 0));
+    for (const e of sn.ev) if (+e[0] > W.evSeen) { W.evSeen = +e[0]; fx(String(e[1]), +e[2], +e[3], +e[4], String(e[5] ?? '')); }
+  }
+  if (W.phase !== prevPhase) onPhase(prevPhase, W.phase);
+}
+function makeView(id, k, pid, name, fk){
+  const isMe = pid && pid === Net.myId;
+  const key = k === 2 ? fk : (pid || fk || ('ai' + id));
+  const f = faceFor(key);
+  const v = { id, k, pid, name, key, dx:0, dz:0, dy:0, x:0, z:0, y:0, flex:0 };
+  if (k === 1) { v.mesh = buildHawk(f.tex); }
+  else { v.mesh = buildChick(f.tex); }
+  if (pid && k !== 2) { v.mesh.tag = nameSprite(isMe ? '▼ 你' : name, isMe ? '#ffd23f' : '#fff2cf'); v.mesh.root.add(v.mesh.tag); }
+  return v;
+}
+function disposeView(v){
+  const m = v.mesh; scene.remove(m.root); if (m.shadow) scene.remove(m.shadow); if (m.ret) scene.remove(m.ret); if (m.cross) scene.remove(m.cross);
+  m.root.traverse(o => { if (o.geometry && o.geometry !== OUT) o.geometry.dispose?.(); });
+}
+const meView = () => W.ents.find(v => v.pid === Net.myId && v.k !== 2);
+const nameOf = pid => (lobbyList.find(p => p[0] === pid) || [])[1] || '';
+
+/* ---------------- effects router (runs on every client) ---------------- */
+let shake = 0, punch = 0, redFlash = 0, danger = 0, flashCol = '255,90,60';
+const popups = [], callouts = [];
+function popup(x, y, z, text, color){ popups.push({ x, y, z, text, color, t:0 }); if (popups.length > 12) popups.shift(); }
+function callout(text, color='#ffd23f', big=64){ callouts.length = 0; callouts.push({ text, color, t:0, big }); }
+function fx(type, x, z, a, s){
+  const me = meView(), mine = s && s.split('|')[0] === Net.myId && Net.myId;
+  const who = s ? (s.split('|')[1] || nameOf(s.split('|')[0]) || '') : '';
+  switch (type) {
+    case 'bump': if (BUMPERS[a]) BUMPERS[a].flash = 1; burst(x, .7, z, 8, [0xfff2cf, BCOL[a] || 0xffffff], 5, .4); SFX.bump(); break;
+    case 'hop': burst(x, .1, z, 5, 0xfff2cf, 3, .3); if (mine) SFX.hop(); break;
+    case 'stomp': wave(x, z, 3, 0xff8a3c); burst(x, .2, z, 14, [0xff8a3c, 0xfff2cf], 6, .5); SFX.shove(); shake = Math.max(shake, .35); break;
+    case 'aim': SFX.aim(); break;
+    case 'dive': SFX.dive(); break;
+    case 'impact': wave(x, z); burst(x, .15, z, 12, [0x9a8fc4, 0xfff2cf], 5, .45); SFX.impact(); shake = Math.max(shake, MOTION.impactShake); break;
+    case 'near': popup(x, 2.2, z, `好险 +${a}`, '#fff2cf'); if (mine) SFX.near(); break;
+    case 'dodge': popup(x, 2.4, z, `闪避 +${a}`, '#53e3b7'); if (mine) { callout('闪避！', '#53e3b7'); SFX.dodge(); } break;
+    case 'hit': case 'out': {
+      burst(x, 1, z, 30, [0xffffff, 0xffd23f, 0xffe9a8], 7, 1, 9, 1.2); SFX.hit();
+      if (mine) { shake = MOTION.hitShake; punch = 1; redFlash = 1; flashCol = '255,90,60'; callout(type === 'out' ? '被叼走了…' : '被啄了！', '#ff5a3c'); }
+      else if (me && me.k === 1) { callout(type === 'out' ? `抓到 ${who}！` : `啄中 ${who}！`, '#ffd23f'); shake = .4; punch = .6; }
+      else callout(type === 'out' ? `${who} 被叼走了！` : `${who} 被啄了`, '#ff8fb3', 44);
+      break;
+    }
+    case 'punch': {
+      SFX.punch(); burst(x, 1.5, z, 40, [0xff8a3c, 0xffd23f, 0xfff2cf], 9, .9, 8, 1.3); wave(x, z, 4.5, 0xff8a3c);
+      shake = 1; punch = 1; redFlash = .7; flashCol = '255,138,60';
+      callout(mine ? '一拳打飞老鹰！' : `${who} 一拳打飞老鹰！`, '#ff8a3c', mine ? 64 : 44);
+      break;
+    }
+    case 'fake': SFX.poof(); burst(x, .8, z, 16, [0xff8fb3, 0xfff2cf], 5, .5); callout('假的！', '#ff8fb3'); break;
+    case 'poof': burst(x, .8, z, 10, [0xff8fb3, 0xfff2cf], 4, .4); break;
+    case 'egg': { const [pid, combo] = s.split('|'); popup(x, 1.6, z, +combo > 1 ? `+${a} 连击×${combo}` : `+${a}`, '#ffd23f'); burst(x, .6, z, 12, [0xffd23f, 0xfff2cf], 5, .5); if (pid === Net.myId) SFX.egg(+combo || 1); break; }
+    case 'buff': {
+      const k = BUFF_KEYS[a] || 'speed', B = BUFFS[k];
+      burst(x, 1, z, 20, [0xff8a3c, 0xffd23f, 0xfff2cf], 6, .6); SFX.roulette();
+      if (k === 'muscle') setTimeout(() => SFX.muscle(), 250);
+      callout(mine ? `${B.name}！` : `${who} 变成${B.name}`, B.color, mine ? 64 : 40);
+      break;
+    }
+    case 'hbuff': { const k = HB_KEYS[a] || 'claw'; SFX.claw(); callout(mine ? `你获得 ${HAWK_BUFFS[k].name}！` : `老鹰获得 ${HAWK_BUFFS[k].name}！`, HAWK_BUFFS[k].color, 44); break; }
+    case 'shove': SFX.shove(); burst(x, .6, z, 6, 0xff8a3c, 4, .3); break;
+    case 'win': {
+      const meK = me ? me.k : -1, iWon = (a === 1) === (meK === 1);
+      callout(a === 1 ? '老鹰赢了！' : '小鸡们赢了！', a === 1 ? '#ff5a3c' : '#53e3b7');
+      if (me) (iWon ? SFX.win : SFX.lose)(); else SFX.win();
+      break;
+    }
+  }
+}
+
+/* ---------------- phase transitions & UI ---------------- */
+function onPhase(prev, ph){
+  if (ph === 'count') {
+    $('#lobby').hidden = true; $('#menu').hidden = true; $('#endOv').hidden = true; $('#help').hidden = IS_TOUCH;
+    face.maxJaw = 0; popups.length = 0; callouts.length = 0;
+    try { navigator.wakeLock?.request('screen').catch(() => {}); } catch {}
+    { const s = snapC.getContext('2d'); s.clearRect(0,0,FPX,FPX); s.drawImage(faceFor(Net.myId).c, 0, 0); }
+    startRec();
+  }
+  if (ph === 'lobby' && Net.role === 'client') { showLobby(); }
+}
+function showLobby(){ $('#menu').hidden = true; $('#endOv').hidden = true; $('#lobby').hidden = false; renderLobby(); }
+function renderLobby(){
+  $('#codeBig').textContent = Net.code || '----';
+  const list = Net.role === 'host' ? [...players.values()].map(p => [p.pid, p.name]) : lobbyList;
+  const hostId = Net.role === 'host' ? Net.myId : Net.hostId;
+  $('#plist').innerHTML = list.map(([pid, name]) => {
+    const f = faces.get(pid), img = f && f.real ? `<img alt="" src="${f.c.toDataURL()}">` : '<i></i>';
+    return `<li>${img}<span>${esc(name)}${pid === Net.myId ? '（你）' : ''}</span>${pid === hostId ? '<em>房主</em>' : ''}</li>`;
+  }).join('') || '<li>连接中…</li>';
+  $('#startBtn').hidden = Net.role !== 'host'; $('#waitTxt').hidden = Net.role === 'host';
+  $('#startBtn').textContent = list.length < 2 ? '开始（只有你：电脑当老鹰）' : '开始这一局';
+}
+function toMenu(msg){
+  stopRec(); netLeave(); views.forEach(v => disposeView(v)); views.clear();
+  W.phase = 'idle'; W.ents = []; W.items = []; W.eggs = []; W.res = null; W.evSeen = -1; W.rd = 0;
+  S.phase = 'lobby'; S.ents = []; S.round = 0;
+  $('#lobby').hidden = true; $('#endOv').hidden = true; $('#menu').hidden = false; $('#help').hidden = true; $('#netTag').hidden = true;
+  $('#note').innerHTML = msg ? `<span class="err">${esc(msg)}</span>` : '人脸只在你自己的设备上识别，只会把你 24×24 的像素头像发给同房间的人。不开摄像头也能玩：手指拖动移动，右下按钮跳。';
+  setButtons(false);
+}
+function setButtons(busy){ for (const id of ['createBtn','joinBtn','soloBtn']) $('#'+id).disabled = busy; }
+async function prepCamera(){
+  if (!$('#camChk').checked) { face.on = false; return; }
+  try { await startCamera(); }
+  catch (err) { face.on = false; $('#note').innerHTML = `<span class="err">${err && err.name === 'NotAllowedError' ? '摄像头权限被拒绝，先用鼠标玩。' : '人脸识别没加载成功，先用鼠标玩。'}</span>`; }
+}
+$('#nick').value = store.nick || '';
+$('#nick').addEventListener('change', () => { store.nick = $('#nick').value.trim(); save(); });
+$('#recChk').addEventListener('change', e => wantRec = e.target.checked);
+$('#createBtn').addEventListener('click', async () => {
+  ensureAudio(); setButtons(true); $('#note').textContent = '正在创建房间…';
+  try {
+    await prepCamera();
+    await netHost();
+    players.set(Net.myId, { pid:Net.myId, name:myName(), ix:0, iz:2, hop:0, hopSeen:0, last:performance.now(), face:null });
+    S.phase = 'lobby'; broadcastLobby(); showLobby(); setNetTag();
+  } catch (err) { netLeave(); toMenu(LOCAL ? '创建失败。' : '连不上联机服务器（PeerJS）。检查网络后再试，或换个网络。'); }
+});
+$('#joinBtn').addEventListener('click', async () => {
+  const code = $('#codeIn').value.trim().toUpperCase();
+  if (!/^[A-Z0-9]{4}$/.test(code)) { $('#codeIn').focus(); return; }
+  ensureAudio(); setButtons(true); $('#note').textContent = '正在加入…';
+  try { await prepCamera(); await netJoin(code); showLobby(); setNetTag(); }
+  catch (err) { netLeave(); toMenu(err && (err.message === 'notfound' || err.type === 'peer-unavailable') ? `找不到房间 ${code}，确认房间号，或者房主那边是否还开着。` : '连接失败，可能是网络限制了点对点连接。换个网络再试。'); }
+});
+$('#soloBtn').addEventListener('click', async () => {
+  ensureAudio(); setButtons(true);
+  await prepCamera();
+  Net.role = 'solo'; Net.myId = 'me'; players.clear(); players.set('me', { pid:'me', name:myName(), ix:0, iz:2, hop:0, hopSeen:0, last:performance.now() });
+  setButtons(false); startRound();
+});
+$('#startBtn').addEventListener('click', () => { if (Net.role === 'host') startRound(); });
+$('#againBtn').addEventListener('click', () => { if (Net.role === 'host' || Net.role === 'solo') startRound(); });
+$('#leaveBtn').addEventListener('click', () => toMenu());
+$('#homeBtn').addEventListener('click', () => toMenu());
+$('#copyBtn').addEventListener('click', async () => { try { await navigator.clipboard.writeText(Net.code); $('#copyBtn').textContent = '已复制'; setTimeout(() => $('#copyBtn').textContent = '复制房间号', 1200); } catch {} });
+function setNetTag(){ const t = $('#netTag'); t.hidden = false; t.textContent = `${LOCAL ? '本机测试' : '联机'} · 房间 ${Net.code}`; }
+
+/* ---------------- recording ---------------- */
+let wantRec = true, rec = null, recChunks = [], recBlob = null, recExt = 'webm', recStopAt = 0;
+function startRec(){
+  stopRec(true); recBlob = null; $('#saveBtn').hidden = true;
+  if (!wantRec || !out.captureStream || typeof MediaRecorder === 'undefined') return;
+  const tracks = [...out.captureStream(30).getVideoTracks()];
+  if (recDest) tracks.push(...recDest.stream.getAudioTracks());
+  const mime = ['video/mp4;codecs=avc1,mp4a.40.2','video/mp4','video/webm;codecs=vp9,opus','video/webm'].find(m => MediaRecorder.isTypeSupported(m));
+  try { rec = new MediaRecorder(new MediaStream(tracks), mime ? { mimeType:mime, videoBitsPerSecond:6e6 } : undefined); } catch { rec = null; return; }
+  recExt = (rec.mimeType || '').includes('mp4') ? 'mp4' : 'webm';
+  recChunks = []; rec.ondataavailable = e => { if (e.data.size) recChunks.push(e.data); };
+  const r = rec;
+  rec.onstop = () => { if (r.discard) return; recBlob = new Blob(recChunks, { type:r.mimeType || 'video/webm' }); $('#saveBtn').hidden = false; $('#recBadge').hidden = true; };
+  rec.start(250); $('#recBadge').hidden = false;
+}
+function stopRec(discard){ if (rec && rec.state === 'recording') { rec.discard = !!discard; rec.stop(); } $('#recBadge').hidden = true; }
+$('#saveBtn').addEventListener('click', () => {
+  if (!recBlob) return;
+  const a = document.createElement('a'); a.href = URL.createObjectURL(recBlob);
+  a.download = `弹弹追鸡-第${W.rd}局-${new Date().toISOString().slice(0,16).replace(/[:T]/g,'')}.${recExt}`;
+  document.body.appendChild(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 2000);
+});
+
+/* ---------------- HUD ---------------- */
+const FONT = s => `${s}px "DotGothic16","Silkscreen","PingFang SC","Microsoft YaHei",monospace`;
+function text(str, x, y, size, color, align='center', stroke=6){
+  ctx.font = FONT(size); ctx.textAlign = align; ctx.textBaseline = 'middle';
+  if (stroke > 0) { ctx.lineJoin = 'round'; ctx.lineWidth = stroke; ctx.strokeStyle = '#0b0817'; ctx.strokeText(str, x, y); }
+  ctx.fillStyle = color; ctx.fillText(str, x, y);
+}
+function box(x, y, w, h, fill='#2b2250'){ ctx.fillStyle = '#0b0817'; ctx.fillRect(x-4, y-4, w+8, h+12); ctx.fillStyle = fill; ctx.fillRect(x, y, w, h); ctx.fillStyle = 'rgba(255,255,255,.08)'; ctx.fillRect(x, y, w, 4); }
+const HEART = ['0110110','1111111','1111111','0111110','0011100','0001000'];
+function heart(x, y, on, s=4){ for (let r=0;r<6;r++) for (let c=0;c<7;c++) if (HEART[r][c] === '1') { ctx.fillStyle = on ? '#ff5a3c' : '#4a4170'; ctx.fillRect(x+c*s, y+r*s, s, s); } }
+function faceImg(key, x, y, size){ const f = faceFor(key); ctx.imageSmoothingEnabled = false; ctx.drawImage(f.c, x, y, size, size); }
+const _v = new THREE.Vector3();
+function project(x, y, z){ _v.set(x,y,z).project(camera); return [(_v.x*.5+.5)*OW, (-_v.y*.5+.5)*OH]; }
+
+function drawPreview(){
+  const x = 14, y = 14, w = 90, h = 120;
+  box(x, y, w, h, '#0b0817');
+  if (face.on && video.readyState >= 2) {
+    pctx.save(); pctx.translate(36,0); pctx.scale(-1,1);
+    const vw = video.videoWidth, vh = video.videoHeight, sw = vh*.75;
+    pctx.drawImage(video, (vw-sw)/2, 0, sw, vh, 0, 0, 36, 48); pctx.restore();
+    ctx.imageSmoothingEnabled = false; ctx.drawImage(prevC, x, y, w, h);
+    const fx0 = (vw-sw)/2/vw, sx = x + (1 - (face.nx - fx0)/(sw/vw))*w, sy = y + face.ny*h;
+    ctx.fillStyle = face.ok ? '#53e3b7' : '#ff5a3c'; ctx.fillRect(sx-3, sy-3, 6, 6);
+    ctx.fillStyle = '#0b0817'; ctx.fillRect(x, y+h+8, w, 12);
+    ctx.fillStyle = face.jaw > .42 ? '#ff8fb3' : '#9a8fc4'; ctx.fillRect(x+2, y+h+10, (w-4)*clamp(face.jaw/.6, 0, 1), 8);
+    ctx.fillStyle = '#fff2cf'; ctx.fillRect(x + 2 + (w-4)*.7, y+h+8, 2, 12);
+  } else {
+    text(IS_TOUCH ? '触屏模式' : '鼠标模式', x+w/2, y+h/2-10, 14, '#9a8fc4', 'center', 4);
+    text(IS_TOUCH ? '拖动=移动' : '点击=张嘴', x+w/2, y+h/2+12, 14, '#9a8fc4', 'center', 4);
+  }
+}
+function drawHUD(rdt){
+  if (danger > 0) {
+    const g = ctx.createRadialGradient(OW/2, OH/2, OH*.25, OW/2, OH/2, OH*.62);
+    g.addColorStop(0, 'rgba(255,60,40,0)'); g.addColorStop(1, `rgba(255,60,40,${.5*danger})`);
+    ctx.fillStyle = g; ctx.fillRect(0,0,OW,OH);
+  }
+  if (redFlash > 0) { ctx.fillStyle = `rgba(${flashCol},${redFlash*.45})`; ctx.fillRect(0,0,OW,OH); }
+  const me = meView();
+  const playing = W.phase === 'play' || W.phase === 'count' || W.phase === 'end';
+  if (playing) {
+    drawPreview();
+    const left = Math.max(0, W.tm), s = Math.ceil(left);
+    box(OW/2-56, 16, 112, 48);
+    const tsc = left < 5 && W.phase === 'play' ? 1 + (1 - (left % 1))*.18 : 1;
+    ctx.save(); ctx.translate(OW/2, 42); ctx.scale(tsc, tsc); text(`${Math.floor(s/60)}:${String(s%60).padStart(2,'0')}`, 0, 0, 30, left < 10 ? '#ff5a3c' : '#fff2cf'); ctx.restore();
+    // role line
+    if (me) {
+      const isHawk = me.k === 1;
+      text(isHawk ? '你是老鹰' : me.out ? '你是小幽灵' : '你是小鸡', OW/2, 88, 20, isHawk ? '#ff5a3c' : me.out ? '#9be7ff' : '#ffd23f', 'center', 5);
+      if (isHawk) {
+        const ready = me.cd <= 0 && !me.stun && me.state === 'fly';
+        ctx.fillStyle = '#0b0817'; ctx.fillRect(OW/2-60, 104, 120, 14);
+        ctx.fillStyle = ready ? '#ff5a3c' : '#4a4170'; ctx.fillRect(OW/2-58, 106, 116*(ready ? 1 : clamp(1 - me.cd/MOTION.hawkCd, 0, 1)), 10);
+        text(me.stun ? '被打晕了！' : ready ? '张嘴 = 俯冲' : '…', OW/2, 132, 16, me.stun ? '#ff8a3c' : '#fff2cf', 'center', 4);
+        if (me.claw || me.quick) text(me.claw ? '巨爪 ×2' : '闪电俯冲 ×2', OW/2, 154, 16, '#ffd23f', 'center', 4);
+      } else {
+        for (let i=0;i<GAME.hearts;i++) heart(OW/2-26 + i*30, 104, i < me.hearts, 4);
+        if (me.buff && me.buff !== 'decoy') text(`${BUFFS[me.buff].name} ${Math.ceil(me.buffT)}`, OW/2, 142, 18, BUFFS[me.buff].color, 'center', 4);
+      }
+    }
+    // scoreboard (right)
+    const list = W.ents.filter(v => v.k !== 2);
+    list.forEach((v, i) => {
+      const y = 16 + i*38, x = OW-150;
+      ctx.fillStyle = 'rgba(11,8,23,.75)'; ctx.fillRect(x, y, 136, 32);
+      ctx.globalAlpha = v.out ? .45 : 1;
+      faceImg(v.k === 1 && !v.pid ? 'hawk-ai' : v.key, x+4, y+4, 24);
+      text(v.pid === Net.myId ? '你' : v.name.slice(0,4), x+34, y+16, 15, v.k === 1 ? '#ff5a3c' : '#fff2cf', 'left', 4);
+      text(String(v.score), x+130, y+16, 15, '#ffd23f', 'right', 4);
+      ctx.globalAlpha = 1;
+    });
+  }
+  for (let i=popups.length-1;i>=0;i--) {
+    const p = popups[i]; p.t += rdt;
+    if (p.t > 1) { popups.splice(i,1); continue; }
+    const [sx, sy] = project(p.x, p.y, p.z);
+    const sc = p.t < .15 ? easeOutBack(p.t/.15) : 1;
+    ctx.save(); ctx.globalAlpha = p.t > .7 ? 1 - (p.t-.7)/.3 : 1; ctx.translate(sx, sy - easeOutCubic(p.t)*MOTION.popupRise); ctx.scale(sc, sc);
+    text(p.text, 0, 0, 22, p.color); ctx.restore();
+  }
+  for (let i=callouts.length-1;i>=0;i--) {
+    const c = callouts[i]; c.t += rdt;
+    const total = MOTION.calloutIn + MOTION.calloutHold + .2;
+    if (c.t > total) { callouts.splice(i,1); continue; }
+    const sc = c.t < MOTION.calloutIn ? easeOutBack(c.t/MOTION.calloutIn) : 1;
+    ctx.save(); ctx.globalAlpha = c.t > total-.2 ? (total-c.t)/.2 : 1; ctx.translate(OW/2, OH*.36); ctx.scale(sc, sc); ctx.rotate(-.04);
+    const fit = Math.min(c.big, (OW-40)/Math.max(1, c.text.length));
+    text(c.text, 0, 0, fit, c.color, 'center', Math.max(6, fit/5)); ctx.restore();
+  }
+  if (W.phase === 'count') {
+    const n = Math.ceil(W.ct), f = 1 - (((W.ct % 1) + 1) % 1);
+    const sc = easeOutBack(Math.min(1, f/.25));
+    ctx.save(); ctx.translate(OW/2, OH*.42); ctx.scale(sc*1.2, sc*1.2); text(n > 0 ? String(n) : '跑！', 0, 0, 96, '#ffd23f', 'center', 14); ctx.restore();
+    const isHawk = me && me.k === 1;
+    box(30, OH*.52, OW-60, 70, '#0b0817');
+    text(isHawk ? '你是老鹰：转头移动 · 张嘴锁定俯冲' : '你是小鸡：转头跑 · 张嘴跳 · 抢 ? 盒子', OW/2, OH*.52+24, 20, isHawk ? '#ff5a3c' : '#ffd23f', 'center', 4);
+    text(face.on ? (face.ok ? '正对屏幕，倒计时结束时自动校准' : '把脸放进摄像头画面') : IS_TOUCH ? '手指拖动移动 · 右下按钮跳' : '鼠标移动 · 点击 = 张嘴', OW/2, OH*.52+52, 16, '#9a8fc4', 'center', 4);
+  }
+  if (W.phase === 'play' && me) drawArrows(me);
+  if (W.phase === 'end' && W.res && W.et > .8) drawCard(W.et - .8);
+  if (timeScale !== 1) text('慢放 ×0.25', OW/2, OH-24, 18, '#53e3b7', 'center', 4);
+}
+function drawArrows(me){
+  // 画面外的对手：沿屏幕边缘画箭头 + 头像
+  for (const v of W.ents) {
+    if (v === me || v.k === 2 || v.out) continue;
+    if (v.buff === 'ghost') continue;
+    const enemy = (me.k === 1) !== (v.k === 1);
+    if (!enemy && me.k !== 1) { /* teammates: only show if far */ }
+    const [sx, sy] = project(v.dx, v.k === 1 ? 0 : 1, v.dz);
+    const mX = 40, mT = 190, mB = 70;
+    if (sx > mX && sx < OW-mX && sy > mT && sy < OH-mB) continue;
+    const cx = OW/2, cy = OH/2, ang = Math.atan2(sy-cy, sx-cx);
+    const ex = clamp(sx, mX, OW-mX), ey = clamp(sy, mT, OH-mB);
+    const col = v.k === 1 ? '#ff5a3c' : enemy ? '#ffd23f' : '#9a8fc4';
+    ctx.save(); ctx.translate(ex, ey);
+    ctx.save(); ctx.rotate(ang); ctx.fillStyle = '#0b0817'; ctx.beginPath(); ctx.moveTo(26,0); ctx.lineTo(4,-14); ctx.lineTo(4,14); ctx.closePath(); ctx.fill();
+    ctx.fillStyle = col; ctx.beginPath(); ctx.moveTo(21,0); ctx.lineTo(7,-9); ctx.lineTo(7,9); ctx.closePath(); ctx.fill(); ctx.restore();
+    ctx.fillStyle = col; ctx.beginPath(); ctx.arc(0, 0, 15, 0, 7); ctx.fill();
+    ctx.imageSmoothingEnabled = false; ctx.drawImage(faceFor(v.k === 1 && !v.pid ? 'hawk-ai' : v.key).c, -12, -12, 24, 24);
+    ctx.restore();
+    if (v.k === 1 && (v.state === 'aim' || v.state === 'dive') && me.k !== 1) text('!', ex, ey-26, 22, '#ff5a3c', 'center', 5);
+  }
+}
+function drawCard(t){
+  const res = W.res, p = clamp(t/MOTION.cardIn, 0, 1), y0 = (1 - easeOutBack(p))*OH*.7;
+  ctx.fillStyle = `rgba(17,12,34,${.7*p})`; ctx.fillRect(0,0,OW,OH);
+  const rows = res.rows.slice(0, 6), w = 470, h = 150 + rows.length*76 + 70, x = (OW-w)/2, y = 70 + y0;
+  box(x, y, w, h, '#2b2250'); ctx.fillStyle = '#382d66'; ctx.fillRect(x+10, y+10, w-20, h-20);
+  text(res.win === 'hawk' ? '老鹰赢了！' : '小鸡们赢了！', OW/2, y+52, 44, res.win === 'hawk' ? '#ff5a3c' : '#53e3b7', 'center', 10);
+  text(`第 ${W.rd} 局`, OW/2, y+96, 16, '#9a8fc4', 'center', 4);
+  const sp = clamp((t - .35)/MOTION.scoreCount, 0, 1);
+  rows.forEach((r, i) => {
+    const [pid, name, isHawk, score, line, aiKey] = r, ry = y + 130 + i*76, isMe = pid && pid === Net.myId;
+    const rp = clamp((t - .2 - i*.08)/.35, 0, 1), rx = x + 24 + (1 - easeOutBack(rp))*-60;
+    ctx.globalAlpha = rp;
+    ctx.fillStyle = isMe ? '#4a3d80' : '#0b0817'; ctx.fillRect(rx, ry, w-48, 64);
+    ctx.fillStyle = isHawk ? '#ff5a3c' : '#ffd23f'; ctx.beginPath(); ctx.arc(rx+36, ry+32, 28, 0, 7); ctx.fill();
+    ctx.imageSmoothingEnabled = false;
+    ctx.drawImage(isMe && face.on ? snapC : faceFor(pid || (isHawk ? 'hawk-ai' : aiKey)).c, rx+12, ry+8, 48, 48);
+    text(`${isMe ? '你' : name} · ${isHawk ? '老鹰' : '小鸡'}`, rx+74, ry+20, 18, isHawk ? '#ff8a6c' : '#fff2cf', 'left', 4);
+    text(line, rx+74, ry+46, 14, '#9a8fc4', 'left', 3);
+    text(String(Math.round(score*easeOutCubic(sp))), rx + w - 60, ry+32, 28, '#ffd23f', 'right', 6);
+    if (i === res.mvp) { ctx.fillStyle = '#ffd23f'; ctx.fillRect(rx + w - 48 - 54, ry - 7, 48, 16); text('MVP', rx + w - 48 - 30, ry + 1, 12, '#0b0817', 'center', 0); }
+    ctx.globalAlpha = 1;
+  });
+  ctx.fillStyle = '#0b0817'; ctx.fillRect(x+24, y+h-62, w-48, 44);
+  text('@你的朋友 来房间里抓我', OW/2, y+h-40, 20, '#ffd23f', 'center', 4);
+}
+
+/* ---------------- main loop ---------------- */
+let last = performance.now(), snapAcc = 0, inAcc = 0, faceAcc = 0, lastInKey = '';
+const CAM_BASE = new THREE.Vector3(0, 19, 12.5);
+let camX = 0, camZ = 0;
+function frame(now){
+  requestAnimationFrame(frame);
+  const rdt = Math.min(.05, (now-last)/1000); last = now;
+  pollFace(now);
+  if (face.on && face.ok && face.jaw > .42 && face.armed) { face.armed = false; localHop++; }
+  if (face.jaw < .22) face.armed = true;
+  // calibrate at the end of the countdown
+  if (W.phase === 'count' && face.on && face.ok && W.ct < .25 && !face.calRound) { face.cx = face.nx; face.cy = face.ny; face.calRound = W.rd; }
+  if (W.phase !== 'count') face.calRound = 0;
+
+  const authority = Net.role === 'host' || Net.role === 'solo';
+  if (authority && (S.phase === 'count' || S.phase === 'play' || S.phase === 'end')) {
+    const dt = rdt * timeScale * (S.slow > 0 ? MOTION.slowScale : 1);
+    S.slow = Math.max(0, S.slow - rdt);
+    hostStep(dt);
+    const sn = buildSnap();
+    applySnap(sn, true);
+    snapAcc += rdt;
+    if (Net.role === 'host' && snapAcc >= .05) { snapAcc = 0; broadcast(sn); }
+    if (S.phase === 'end' && S.endT > 25 && Net.role === 'host') { S.phase = 'lobby'; broadcast({ t:'snap', ...buildSnap(), ph:'lobby' }); showLobby(); }
+  }
+  if (Net.role === 'host') {
+    for (const p of [...players.values()]) if (p.pid !== Net.myId && now - p.last > 8000) hostDrop(p.pid);
+  }
+  if (Net.role === 'client') {
+    inAcc += rdt;
+    const [x, z] = localTarget(); const key = `${x.toFixed(2)},${z.toFixed(2)},${localHop}`;
+    if ((key !== lastInKey && inAcc > .033) || inAcc > .5) { inAcc = 0; lastInKey = key; Net.toHost && Net.toHost({ t:'in', x:r2(x), z:r2(z), h:localHop }); }
+    for (const v of W.ents) { const k = Math.min(1, rdt*14); v.dx = lerp(v.dx, v.x + v.vx*.05, k); v.dz = lerp(v.dz, v.z + v.vz*.05, k); v.dy = lerp(v.dy, v.y, Math.min(1, rdt*20)); }
+    if (now - Net.lastHost > 9000 && Net.lastHost) hostGone();
+  }
+  // share my face
+  faceAcc += rdt;
+  if (face.on && faceAcc > .6 && (Net.role === 'host' || Net.role === 'client')) {
+    faceAcc = 0; const d = faceFor(Net.myId).c.toDataURL('image/png');
+    if (Net.role === 'host') { const p = players.get(Net.myId); if (p) p.face = d; broadcast({ t:'face', pid:Net.myId, d }); }
+    else Net.toHost && Net.toHost({ t:'face', d });
+  }
+  { const jb = $('#jumpBtn'), mv = meView(), show = IS_TOUCH && !!mv && (W.phase === 'play' || W.phase === 'count') && !mv.out;
+    jb.hidden = !show; if (!show && joy.id !== null) { joy.id = null; joy.x = joy.y = 0; $('#joy').hidden = true; } if (show) { const hawk = mv.k === 1; jb.classList.toggle('hawk', hawk); const t = hawk ? '扑' : '跳'; if (jb.textContent !== t) jb.textContent = t; } }
+  // end overlay
+  if (W.phase === 'end' && W.et > 1.6 && $('#endOv').hidden && W.res) {
+    $('#endOv').hidden = false; $('#help').hidden = true;
+    const can = Net.role === 'host' || Net.role === 'solo';
+    $('#againBtn').hidden = !can; $('#endWait').hidden = can;
+  }
+  if (W.phase === 'end' && W.et > 3.2) stopRec();
+
+  // danger cue for me
+  const me = meView();
+  let aiming = false;
+  if (me && me.k !== 1 && !me.out && (W.phase === 'play')) for (const v of W.ents) if (v.k === 1 && (v.state === 'aim' || v.state === 'dive') && len(v.tx-me.dx, v.tz-me.dz) < 2.4) aiming = true;
+  danger = lerp(danger, aiming ? .6 + Math.sin(now/90)*.4 : 0, Math.min(1, rdt*10));
+  if (aiming && now - lastBeat > 280) { lastBeat = now; SFX.beat(); }
+  redFlash = Math.max(0, redFlash - rdt*2.2);
+  for (const b of BUMPERS) b.flash = Math.max(0, b.flash - rdt*4);
+
+  renderWorld(now/1000, rdt);
+  stepParts(rdt * timeScale);
+  waves.forEach(w => { if (w.t < 0) { w.m.visible = false; return; } w.t += rdt; const p = w.t/.4; if (p >= 1) { w.t = -1; w.m.visible = false; return; } w.m.visible = true; w.m.scale.setScalar(.6 + easeOutCubic(p)*w.max); w.m.material.opacity = 1-p; });
+
+  shake = Math.max(0, shake - rdt*1.8); punch = Math.max(0, punch - rdt*2.5);
+  // 镜头跟随自己（大地图），限制在场地内
+  const fx0 = me ? clamp(me.dx, -HW+4.5, HW-4.5) : 0, fz0 = me ? clamp(me.dz, -HL+6.5, HL-6.5) : 0;
+  const ov = W.phase === 'idle' || W.phase === 'lobby' || !me;
+  camX = lerp(camX, ov ? 0 : fx0, Math.min(1, rdt*5)); camZ = lerp(camZ, ov ? 0 : fz0, Math.min(1, rdt*5));
+  camera.fov = (ov ? 70 : 55) - easeOutCubic(punch)*MOTION.punchFov; camera.updateProjectionMatrix();
+  const lift = ov ? 1.6 : 1;
+  camera.position.set(camX + (Math.random()-.5)*shake, CAM_BASE.y*lift + (Math.random()-.5)*shake, camZ + CAM_BASE.z*lift);
+  camera.lookAt(camX, 0, camZ - .8);
+  renderer.render(scene, camera);
+  ctx.imageSmoothingEnabled = false;
+  ctx.drawImage(glc, 0, 0, OW, OH);
+  if (W.phase === 'idle' || W.phase === 'lobby') { ctx.fillStyle = 'rgba(17,12,34,.35)'; ctx.fillRect(0,0,OW,OH); }
+  drawHUD(rdt);
+}
+function renderWorld(t, rdt){
+  for (const v of W.ents) {
+    const m = v.mesh, isMe = v.pid && v.pid === Net.myId;
+    if (v.k === 1) {
+      m.root.position.set(v.dx, v.dy, v.dz);
+      m.faceSpr.visible = !!(v.pid && faces.get(v.pid)?.real);
+      m.brows.visible = !m.faceSpr.visible;
+      const target = v.state === 'aim' || v.state === 'dive' ? Math.atan2(v.tx - v.dx, v.tz - v.dz) : Math.atan2(v.vx, v.vz || .001);
+      if (v.stun) m.body.rotation.y += rdt*14; else if (len(v.vx, v.vz) > .5 || v.state !== 'fly') m.body.rotation.y = lerpAngle(m.body.rotation.y, target, Math.min(1, rdt*8));
+      m.body.rotation.x = v.state === 'dive' ? .9 : v.state === 'aim' ? -.25 : 0;
+      const wf = v.state === 'dive' ? -1.1 : v.state === 'aim' ? Math.sin(t*22)*.5 : Math.sin(t*8 + v.id)*.45;
+      m.wings.forEach((w,i) => w.rotation.z = (i ? 1 : -1)*wf);
+      m.claws.visible = v.claw;
+      m.shadow.position.set(v.dx, .03, v.dz); m.shadow.scale.setScalar(clamp(1.6 - v.dy*.15, .5, 1.6)); m.shadow.material.opacity = clamp(.55 - v.dy*.04, .15, .5);
+      m.ret.visible = v.state === 'aim' || v.state === 'dive';
+      if (m.ret.visible) {
+        const big = v.claw ? MOTION.clawMul : 1;
+        m.ret.position.set(v.tx, 0, v.tz); m.ret.scale.setScalar(lerp(1.7, 1, easeOutCubic(v.state === 'dive' ? 1 : v.aimP))*big);
+        m.rr.material.opacity = Math.floor(t*(6 + v.aimP*14)) % 2 ? 1 : .35;
+      }
+      m.cross.visible = isMe && v.state === 'fly'; if (m.cross.visible) { m.cross.position.set(v.dx, .05, v.dz); m.cross.rotation.z = t; m.cross.material.color.set(v.cd <= 0 && !v.stun ? 0xff5a3c : 0x9a8fc4); }
+      if (m.tag) m.tag.position.y = 1.9;
+      continue;
+    }
+    // chick / decoy
+    const muscle = v.buff === 'muscle', speed = v.buff === 'speed', ghost = v.buff === 'ghost';
+    m.root.position.set(v.dx, 0, v.dz);
+    const sc = muscle ? MOTION.muscleScale : 1;
+    const airS = v.air ? clamp(v.vy ?? 0, -1, 1)*0 : 0;
+    const s = v.sq + airS;
+    m.body.scale.set(sc*(1+s*.35), sc*(1-s*.45), sc*(1+s*.35));
+    m.body.position.y = .8*sc*(1-s*.45) + v.dy;
+    m.body.rotation.y = clamp(v.vx*.05, -.5, .5);
+    m.body.rotation.z = -clamp(v.vx*.03, -.3, .3);
+    m.muscle.visible = muscle;
+    if (muscle) {
+      v.flex += rdt; const fp = (v.flex % MOTION.flexEvery)/MOTION.flexEvery, flex = fp < .5 ? easeOutBack(fp*2) : 1 - easeOutCubic((fp-.5)*2);
+      m.muscle.children.forEach(ch => { if (ch.userData && ch.userData.elbow) { ch.rotation.z = ch.userData.s*(-.2 + flex*.5); ch.userData.elbow.rotation.z = ch.userData.s*(flex*1.4); } });
+      m.bodyMat.color.set(0xffb347);
+    } else m.bodyMat.color.set(v.out ? 0xbfe7ff : 0xffd23f);
+    const flap = v.air ? .9 + Math.sin(t*30)*.4 : (len(v.vx, v.vz) > 3 ? Math.abs(Math.sin(t*16))*.6 : .08);
+    m.wings.forEach((w,i) => { w.rotation.z = (i ? 1 : -1)*flap; w.visible = !muscle; });
+    m.shadow.scale.setScalar(Math.max(.4, 1 - v.dy*.12)*sc);
+    m.halo.visible = v.out;
+    // transparency: ghost buff (others barely see), knocked out (ghost), invuln blink
+    let a = 1;
+    if (v.out) a = .45;
+    if (ghost) a = isMe || (v.k === 2 && v.key === Net.myId) ? .45 : .1;
+    const blink = v.inv && !v.out && Math.floor(t*14) % 2 === 0;
+    if (Math.abs(m.ghostA - a) > .01) { m.ghostA = a; m.mats.forEach(x => { x.transparent = a < 1; x.opacity = a; x.depthWrite = a >= 1; }); m.faceSpr.material.opacity = a; m.shadow.material.opacity = .35*a; }
+    m.root.visible = !blink;
+    if (m.tag) { m.tag.visible = !ghost || isMe; m.tag.position.y = 2*sc + 1 + v.dy; }
+    if (speed && len(v.vx, v.vz) > 5 && Math.random() < .6) burst(v.dx - v.vx*.04, .4, v.dz - v.vz*.04, 1, 0xffd23f, .6, .3, 0, .9);
+  }
+  // items & eggs
+  itemMeshes.forEach((m, i) => { const it = W.items[i]; m.visible = !!it; if (it) { m.position.set(it[1], .8 + Math.sin(t*3+i)*.15, it[2]); m.rotation.set(.3, t*2, 0); } });
+  eggMeshes.forEach((m, i) => { const g = W.eggs[i]; m.visible = !!g; if (g) { m.position.set(g[0], .55 + Math.sin(t*3+i)*.12, g[1]); m.scale.set(1, 1.3, 1); m.rotation.y = t*1.5; } });
+  bumperMeshes.forEach((m,i) => { const f = BUMPERS[i].flash; m.cap.scale.set(1+f*.2, 1-f*.18, 1+f*.2); m.capMat.emissiveIntensity = f; });
+}
+function lerpAngle(a, b, t){ let d = b - a; d = Math.atan2(Math.sin(d), Math.cos(d)); return a + d*t; }
+
+// AI hawk face for scoreboard
+{ const f = faceFor('hawk-ai'); const g = f.c.getContext('2d'); g.clearRect(0,0,FPX,FPX); g.fillStyle = '#8e5530'; g.beginPath(); g.arc(12,12,12,0,7); g.fill(); g.fillStyle = '#fff2cf'; g.fillRect(5,4,14,7); g.fillStyle = '#0b0817'; g.fillRect(6,9,5,2); g.fillRect(13,9,5,2); g.fillRect(8,11,2,3); g.fillRect(14,11,2,3); g.fillStyle = '#ffc23d'; g.fillRect(10,14,4,4); g.fillRect(11,18,2,2); circleMaskAndQuantize(f.c); f.tex.needsUpdate = true; }
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>
