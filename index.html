@@ -112,22 +112,26 @@ import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.m
 const MP = 'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14';
 const FACE_MODEL = 'https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task';
 const PEERJS = 'https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js';
-const LOCAL = new URLSearchParams(location.search).has('local'); // 本机多标签测试（BroadcastChannel）
+const QS = new URLSearchParams(location.search);
+const LOCAL = QS.has('local'); // 本机多标签测试（BroadcastChannel）
+const SIM = +QS.get('sim') || 0;  // 自动对战模拟：?sim=局数&players=人数&tune={"MOTION":{...},"GAME":{...}}
 
 /* =====================================================================
    动效规范 MOTION SPEC
    ===================================================================== */
 const MOTION = {
+  chickSpeed:9, chickSpeedBuff:13, chickSpeedMuscle:7.5, bumperKick:7,
+  aiReact:[.3,.5], laneBoost:17, spinKick:7, flipKick:15, tunnelMax:2.5, tunnelCd:6, rescueTime:1.5, rescueRadius:1.7,
   hopVelocity:9.5, gravity:30, takeoffStretch:-.55, landSquash:.55, squashSpring:190, squashDamp:11,
-  hawkHeight:6, hawkFly:13.5, hawkRetSpeed:3.2,
-  hawkAim:.62, hawkAimQuick:.3, hawkDive:.24, hawkRise:.55, hawkCd:.75,
-  hitRadius:1.3, clawMul:1.7, nearRadius:2.3,
+  hawkHeight:6, hawkFly:12, hawkRetSpeed:6,
+  hawkAim:.55, hawkAimQuick:.3, hawkDive:.24, hawkRise:.45, hawkCd:.5,
+  hitRadius:1.7, clawMul:1.7, nearRadius:2.3,
   hitSlowmo:.3, slowScale:.25, hitShake:.8, impactShake:.28, punchFov:7,
   punchStun:1.6, fakeStun:.6,
   calloutIn:.18, calloutHold:.6, popupRise:70, cardIn:.6, scoreCount:.9,
   muscleScale:1.55, flexEvery:1.1,
 };
-const GAME = { dur:50, hearts:2, minChicks:3, eggPts:10, dodgePts:5, catchPts:30, hitPts:10, punchPts:15, hawkBuffEvery:12, itemEvery:4, maxItems:3, eggs:5 };
+const GAME = { hawkSpawnZ:-4, hawkStartCd:0, hawkScale:.12, timeupHawkFrac:.5, hawkWinFrac:1, eggRespawn:[2.5,4.5], dur:45, hearts:1, minChicks:3, eggPts:10, dodgePts:5, catchPts:30, hitPts:10, punchPts:15, hawkBuffEvery:12, itemEvery:8, maxItems:2, eggs:3, rescuePts:20, targetPts:5, jackpotPts:15 };
 const BUFFS = {
   muscle:{ name:'肌肉男小鸡', dur:6, color:'#ff8a3c', w:.34 },
   speed: { name:'闪电小鸡',   dur:6, color:'#ffd23f', w:.26 },
@@ -165,7 +169,7 @@ renderer.setPixelRatio(1); renderer.setSize(LW, LH, false);
 const glc = renderer.domElement;
 const scene = new THREE.Scene(); scene.background = new THREE.Color(0x140f26);
 const camera = new THREE.PerspectiveCamera(55, LW/LH, .1, 100);
-const HW = 8, HL = 12;
+const HW = 11, HL = 16;
 const GRAD = (() => { const t = new THREE.DataTexture(new Uint8Array([70,150,255]), 3, 1, THREE.RedFormat); t.minFilter = t.magFilter = THREE.NearestFilter; t.needsUpdate = true; return t; })();
 const toon = (c, x={}) => new THREE.MeshToonMaterial({ color:c, gradientMap:GRAD, ...x });
 const OUT = new THREE.MeshBasicMaterial({ color:0x0b0817, side:THREE.BackSide });
@@ -173,30 +177,130 @@ scene.add(new THREE.HemisphereLight(0xc9c0ff, 0x2a1d4a, .95));
 const sun = new THREE.DirectionalLight(0xfff0d0, 1.6); sun.position.set(-6, 18, 9); scene.add(sun);
 function ctex(w, h, draw){ const c = document.createElement('canvas'); c.width = w; c.height = h; draw(c.getContext('2d'), w, h); const t = new THREE.CanvasTexture(c); t.magFilter = t.minFilter = THREE.NearestFilter; t.colorSpace = THREE.SRGBColorSpace; return t; }
 
+const _m0 = new THREE.Matrix4();
+/* =====================================================================
+   MAP · 乐高弹珠台（参考：黑色瓷砖台面、紫色积木围墙、黄顶立柱、三叶风车、箭头加速道、
+   荧光绿隧道、彩色灯柱靶、底部白色挡板）
+   ===================================================================== */
+const MAP = {
+  posts: [[-7,-13],[0,-12.5],[8,-14.5],[3.5,-8],[0,-3],[-8,-0.5],[7.5,1.5],[0,7.5],[-8.5,10.5],[8.5,10.5]],
+  spinners: [{ x:-5, z:-7.5, len:2.3, w:1.8 }, { x:3, z:2.5, len:2.3, w:-2.0 }],
+  lanes: [{ x:-3, z:-13.5, w:2, l:3, dz:1 }, { x:-4.5, z:8.5, w:2, l:3, dz:-1 }, { x:5.5, z:8, w:2, l:3, dz:-1 }],
+  flippers: [{ px:-6.6, pz:13.4, len:4.4, rest:.42, up:-.42, off:0 }, { px:6.6, pz:13.4, len:4.4, rest:Math.PI-.42, up:Math.PI+.42, off:1.2 }],
+  tunnel: { x0:5.6, x1:10.4, z0:-12.5, z1:-4 },
+  targets: { x:-10.35, z0:2.5, gap:1.3, n:5 },
+};
+const TCOL = [0xe0303a, 0xff7a1a, 0xffa43a, 0xffd23f, 0xb4ff3c];
+const inTunnel = e => e.x > MAP.tunnel.x0 && e.x < MAP.tunnel.x1 && e.z > MAP.tunnel.z0 && e.z < MAP.tunnel.z1;
+function flipAngle(f, t){
+  const P = 2.4, p = (((t + f.off) % P) + P) % P / P;
+  const k = p < .05 ? easeOutCubic(p/.05) : p < .15 ? 1 : p < .27 ? 1 - (p-.15)/.12 : 0;
+  return lerp(f.rest, f.up, k);
+}
+
 const floorTex = ctex(HW*8, HL*8, (g,w,h) => {
-  for (let y=0;y<h;y+=4) for (let x=0;x<w;x+=4) { g.fillStyle = ((x+y)/4)%2 ? '#2e2560' : '#352a6e'; g.fillRect(x,y,4,4); }
-  g.strokeStyle = '#53e3b7'; g.strokeRect(2.5,2.5,w-5,h-5);
-  g.fillStyle = 'rgba(255,210,63,.18)'; g.fillRect(w/2-8, h/2-8, 16, 16);
+  // 黑色乐高瓷砖：2×1 砖缝 + 少量凸点
+  g.fillStyle = '#23212d'; g.fillRect(0,0,w,h);
+  for (let y=0;y<h;y+=4) { const off = (y/4)%2 ? 4 : 0;
+    for (let x=-off;x<w;x+=16) { g.fillStyle = Math.random() < .25 ? '#2a2836' : '#23212d'; g.fillRect(x+1,y+1,15,3); g.fillStyle = '#15141b'; g.fillRect(x,y,1,4); }
+    g.fillStyle = '#15141b'; g.fillRect(0,y,w,1); }
+  for (let i=0;i<70;i++) { const x = Math.floor(Math.random()*w/4)*4+1, y = Math.floor(Math.random()*h/4)*4+1; g.fillStyle = '#34313f'; g.fillRect(x,y,2,2); g.fillStyle = '#4a4659'; g.fillRect(x,y,1,1); }
+  g.strokeStyle = '#7b5cd6'; g.strokeRect(1.5,1.5,w-3,h-3);
 });
 const floor = new THREE.Mesh(new THREE.PlaneGeometry(HW*2, HL*2), toon(0xffffff, { map:floorTex })); floor.rotation.x = -Math.PI/2; scene.add(floor);
-const under = new THREE.Mesh(new THREE.PlaneGeometry(80,80), new THREE.MeshBasicMaterial({ color:0x0f0b1f })); under.rotation.x = -Math.PI/2; under.position.y = -.02; scene.add(under);
-const brick = ctex(16, 8, g => { g.fillStyle='#ff8fb3'; g.fillRect(0,0,16,8); g.fillStyle='#d9628f'; g.fillRect(0,3,16,1); g.fillRect(0,7,16,1); g.fillRect(7,0,1,3); g.fillRect(3,4,1,3); g.fillRect(11,4,1,3); });
+// 场外：紫色乐高底板
+const plateTex = ctex(8, 8, g => { g.fillStyle = '#3f2f86'; g.fillRect(0,0,8,8); g.fillStyle = '#4f3ca3'; g.fillRect(2,2,4,4); g.fillStyle = '#6450c4'; g.fillRect(2,2,3,1); g.fillRect(2,2,1,3); });
+plateTex.wrapS = plateTex.wrapT = THREE.RepeatWrapping; plateTex.repeat.set(70, 70);
+const under = new THREE.Mesh(new THREE.PlaneGeometry(140,140), toon(0xffffff, { map:plateTex })); under.rotation.x = -Math.PI/2; under.position.y = -.02; scene.add(under);
+// 底部斜坡砖（黄 / 浅紫 / 灰蓝，参考照片下沿）
+const apronTex = ctex(64, 24, (g,w,h) => { const cols = ['#ffc93c','#b9a6f2','#9fb3d9','#ffc93c','#7b5cd6'];
+  for (let x=0;x<w;x+=8) { const c = cols[(x/8)%cols.length]; g.fillStyle = c; g.beginPath(); g.moveTo(x,h); g.lineTo(x+8,h); g.lineTo(x+8,0); g.lineTo(x+2,h*.35); g.closePath(); g.fill(); g.fillStyle = 'rgba(0,0,0,.25)'; g.fillRect(x+7,0,1,h); }
+  g.fillStyle = '#2b2250'; g.fillRect(0,h-5,w,5); for (let x=2;x<w;x+=6) { g.fillStyle = '#3f2f86'; g.fillRect(x,h-4,3,3); } });
+const apron = new THREE.Mesh(new THREE.PlaneGeometry(HW*2+2, 7), toon(0xffffff, { map:apronTex })); apron.rotation.x = -Math.PI/2; apron.position.set(0, .01, HL + 4.5); scene.add(apron);
+// 顶部背板：橙色积木山 + 招牌（参考照片上沿）
+const backTex = ctex(128, 48, (g,w,h) => {
+  g.fillStyle = '#16123a'; g.fillRect(0,0,w,h);
+  for (let i=0;i<40;i++) { g.fillStyle = Math.random() < .5 ? '#fff2cf' : '#7fe6ff'; g.fillRect(Math.random()*w|0, Math.random()*h*.6|0, 1, 1); }
+  const peaks = [[0,30],[18,18],[36,30],[54,16],[74,30],[92,18],[110,30],[128,22]];
+  g.fillStyle = '#ff8a3c'; g.beginPath(); g.moveTo(0,h); peaks.forEach(([x,y]) => g.lineTo(x,y)); g.lineTo(w,h); g.fill();
+  g.fillStyle = '#ffc93c'; for (let x=0;x<w;x+=8) for (let y=28;y<h;y+=6) if (Math.random() < .5) g.fillRect(x+1, y, 6, 2);
+  g.fillStyle = '#0b0817'; g.fillRect(34, 3, 60, 14); g.fillStyle = '#ffd23f'; g.font = 'bold 10px monospace'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText('BOUNCE FLOCK', 64, 10.5);
+  g.fillStyle = '#0b0817'; g.fillRect(100, 4, 24, 10); g.fillStyle = '#53e3b7'; g.font = '7px monospace'; g.fillText('SCORE', 112, 9.5);
+});
+const backboard = new THREE.Mesh(new THREE.PlaneGeometry(HW*2+2, 8.25), new THREE.MeshBasicMaterial({ map:backTex })); backboard.position.set(0, 4.1, -HL - 1.05); scene.add(backboard);
+const backFrame = new THREE.Mesh(new THREE.BoxGeometry(HW*2+3, .8, 1.2), toon(0x6e4fd0)); backFrame.position.set(0, 8.5, -HL - 1.3); scene.add(backFrame);
+// 紫色积木围墙 + 顶部凸点
+const brick = ctex(16, 8, g => { g.fillStyle='#6e4fd0'; g.fillRect(0,0,16,8); g.fillStyle='#5236a8'; g.fillRect(0,3,16,1); g.fillRect(0,7,16,1); g.fillRect(7,0,1,3); g.fillRect(3,4,1,3); g.fillRect(11,4,1,3); g.fillStyle='#8a6ff0'; g.fillRect(1,0,5,1); g.fillRect(9,4,4,1); });
+const studGeo = new THREE.CylinderGeometry(.22, .22, .16, 8), studMat = toon(0x8a6ff0);
+const studSpots = [];
 function wall(w, d, x, z){ const t = brick.clone(); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(Math.max(w,d)/1.4, 1); t.needsUpdate = true;
-  const m = new THREE.Mesh(new THREE.BoxGeometry(w, 1.2, d), toon(0xffffff, { map:t })); m.position.set(x, .6, z); scene.add(m); }
+  const m = new THREE.Mesh(new THREE.BoxGeometry(w, 1.2, d), toon(0xffffff, { map:t })); m.position.set(x, .6, z); scene.add(m);
+  const n = Math.floor(Math.max(w,d)); for (let i=0;i<n;i++) { const u = -Math.max(w,d)/2 + .5 + i; studSpots.push(w > d ? [x+u, z] : [x, z+u]); } }
 wall(HW*2+2, 1, 0, -HL-.5); wall(HW*2+2, 1, 0, HL+.5); wall(1, HL*2, -HW-.5, 0); wall(1, HL*2, HW+.5, 0);
+{ const im = new THREE.InstancedMesh(studGeo, studMat, studSpots.length); studSpots.forEach(([x,z],i) => { _m0.makeTranslation(x, 1.28, z); im.setMatrixAt(i, _m0); }); scene.add(im); }
 
-const BUMPERS = [[-3.6,-6],[3.6,-6],[0,-2.2],[-4.4,2],[4.4,2],[0,5.8],[-5.2,8.6],[5.2,8.6],[-5.4,-9.2],[5.4,-9.2]].map(([x,z],i) => ({ x, z, r:.85, flash:0, i }));
-const BCOL = [0xff8fb3, 0x53e3b7, 0xffd23f, 0x53e3b7, 0xff8fb3, 0xffd23f, 0xff8fb3, 0x53e3b7, 0x53e3b7, 0xff8fb3];
-const bumperMeshes = BUMPERS.map((b,i) => {
+// 立柱（黑柱黄顶）= 弹柱
+const BUMPERS = MAP.posts.map(([x,z],i) => ({ x, z, r:.75, flash:0, i }));
+const BCOL = BUMPERS.map(() => 0x7fe6ff);
+const bumperMeshes = BUMPERS.map(b => {
   const g = new THREE.Group();
-  const base = new THREE.Mesh(new THREE.CylinderGeometry(b.r, b.r*1.08, .35, 10), toon(0x2b2250)); base.position.y = .17;
-  const capMat = toon(BCOL[i], { emissive:BCOL[i], emissiveIntensity:0 });
-  const cap = new THREE.Mesh(new THREE.CylinderGeometry(b.r*.85, b.r*.85, .45, 10), capMat); cap.position.y = .55;
-  const o = new THREE.Mesh(cap.geometry, OUT); o.scale.setScalar(1.1); cap.add(o);
-  const top = new THREE.Mesh(new THREE.CylinderGeometry(b.r*.4, b.r*.4, .16, 10), toon(0xfff2cf)); top.position.y = .85;
-  g.add(base, cap, top); g.position.set(b.x, 0, b.z); scene.add(g);
+  const body = new THREE.Mesh(new THREE.CylinderGeometry(b.r*.85, b.r*.85, 1, 10), toon(0x1a1822)); body.position.y = .5;
+  const capMat = toon(0x7fe6ff, { emissive:0x3fb6e0, emissiveIntensity:0, transparent:true, opacity:.9 });
+  const cap = new THREE.Mesh(new THREE.SphereGeometry(b.r*.8, 10, 6, 0, Math.PI*2, 0, Math.PI/2), capMat); cap.position.y = 1;
+  const o = new THREE.Mesh(body.geometry, OUT); o.scale.set(1.12, 1.02, 1.12); body.add(o);
+  g.add(body, cap); g.position.set(b.x, 0, b.z); scene.add(g);
   return { cap, capMat };
 });
+// 三叶风车
+const spinnerMeshes = MAP.spinners.map(sp => {
+  const g = new THREE.Group(); g.position.set(sp.x, 0, sp.z);
+  const base = new THREE.Mesh(new THREE.CylinderGeometry(.9, 1, .12, 12), toon(0x15141b)); base.position.y = .06; g.add(base);
+  const rot = new THREE.Group(); g.add(rot);
+  const armMat = toon(0x2f6fd0, { transparent:true, opacity:.88, emissive:0x1a3a80, emissiveIntensity:.3 }), tipMat = toon(0x7fe6ff, { transparent:true, opacity:.85, emissive:0x3fb6e0, emissiveIntensity:.4 });
+  for (let k=0;k<3;k++) { const a = new THREE.Group(); a.rotation.y = -k*Math.PI*2/3;
+    const arm = new THREE.Mesh(new THREE.BoxGeometry(sp.len, .28, .34), armMat); arm.position.set(sp.len/2, .45, 0);
+    const tip = new THREE.Mesh(new THREE.SphereGeometry(.3, 8, 6), tipMat); tip.position.set(sp.len, .45, 0);
+    a.add(arm, tip); rot.add(a); }
+  const hub = new THREE.Mesh(new THREE.CylinderGeometry(.42, .42, .6, 10), toon(0xf4f1e8)); hub.position.y = .45; rot.add(hub);
+  scene.add(g); return { rot };
+});
+// 箭头加速道
+const laneTex = ctex(8, 12, g => { g.fillStyle = '#15141b'; g.fillRect(0,0,8,12);
+  g.fillStyle = '#d6ff3c'; g.fillRect(3,0,2,1); g.fillRect(2,1,4,1); g.fillRect(1,2,6,1); g.fillRect(0,3,8,1);
+  ['#d6ff3c','#9be83a','#5fcf3a','#3aa83a'].forEach((c,i) => { g.fillStyle = c; g.fillRect(1, 5+i*2, 6, 1); }); });
+const laneMeshes = MAP.lanes.map((ln, i) => { const m = new THREE.Mesh(new THREE.PlaneGeometry(ln.w, ln.l), toon(0xffffff, { map:laneTex, emissive:0x5fcf3a, emissiveIntensity:.15 }));
+  m.rotation.x = -Math.PI/2; m.rotation.z = ln.dz > 0 ? Math.PI : 0; m.position.set(ln.x, .03, ln.z); scene.add(m); return m; });
+// 底部白色挡板
+const flipperMeshes = MAP.flippers.map(f => {
+  const g = new THREE.Group(); g.position.set(f.px, 0, f.pz);
+  const mat = toon(0xf4f1e8);
+  const bar = new THREE.Mesh(new THREE.BoxGeometry(f.len, .7, .7), mat); bar.position.set(f.len/2, .35, 0);
+  const cap0 = new THREE.Mesh(new THREE.CylinderGeometry(.45, .45, .75, 10), mat); cap0.position.y = .37;
+  const cap1 = new THREE.Mesh(new THREE.CylinderGeometry(.35, .35, .7, 10), mat); cap1.position.set(f.len, .35, 0);
+  const o = new THREE.Mesh(bar.geometry, OUT); o.scale.set(1.04, 1.1, 1.18); bar.add(o);
+  const gem = new THREE.Mesh(new THREE.SphereGeometry(.22, 8, 6), toon(0x7fe6ff, { emissive:0x3fb6e0, emissiveIntensity:.5 })); gem.position.y = .85;
+  g.add(bar, cap0, cap1, gem); scene.add(g); return g;
+});
+// 荧光绿隧道（半透明半管 + 肋条）
+const tunnelMesh = (() => {
+  const T = MAP.tunnel, w = T.x1 - T.x0, l = T.z1 - T.z0, g = new THREE.Group(); g.position.set((T.x0+T.x1)/2, 0, (T.z0+T.z1)/2);
+  const shell = new THREE.Mesh(new THREE.CylinderGeometry(w/2, w/2, l, 18, 1, true, -Math.PI/2, Math.PI),
+    new THREE.MeshToonMaterial({ color:0xb4ff3c, gradientMap:GRAD, transparent:true, opacity:.32, emissive:0x7fd12a, emissiveIntensity:.5, side:THREE.DoubleSide, depthWrite:false }));
+  shell.rotation.x = Math.PI/2; shell.rotation.y = 0; shell.rotation.z = Math.PI/2; shell.position.y = 0; g.add(shell);
+  const ribMat = toon(0x6fd12a, { emissive:0x3a8a1a, emissiveIntensity:.4 });
+  for (let i=0;i<=4;i++) { const rib = new THREE.Mesh(new THREE.TorusGeometry(w/2, .12, 4, 16, Math.PI), ribMat); rib.position.z = -l/2 + i*l/4; g.add(rib); }
+  const glow = new THREE.Mesh(new THREE.PlaneGeometry(w, l), new THREE.MeshBasicMaterial({ color:0xb4ff3c, transparent:true, opacity:.14, depthWrite:false }));
+  glow.rotation.x = -Math.PI/2; glow.position.y = .03; g.add(glow);
+  scene.add(g); return { g, shell, glow };
+})();
+// 彩色灯柱靶
+const targetMeshes = (() => {
+  const T = MAP.targets, list = [];
+  const bar = new THREE.Mesh(new THREE.BoxGeometry(.6, .5, T.gap*T.n + .4), toon(0x3aa0e0)); bar.position.set(T.x - .15, .25, T.z0 + T.gap*(T.n-1)/2); scene.add(bar);
+  for (let i=0;i<T.n;i++) { const mat = toon(TCOL[i], { transparent:true, opacity:.92, emissive:TCOL[i], emissiveIntensity:.25 });
+    const m = new THREE.Mesh(new THREE.CylinderGeometry(.42, .42, .5, 10), mat); m.position.set(T.x + .05, .75, T.z0 + i*T.gap); scene.add(m); list.push({ m, mat }); }
+  return list;
+})();
 
 // particles
 const PMAX = 300;
@@ -322,8 +426,16 @@ function buildChick(faceTex){
   const faceSpr = new THREE.Sprite(new THREE.SpriteMaterial({ map:faceTex, transparent:true })); faceSpr.scale.set(1.25, 1.25, 1); faceSpr.position.set(0, r*.15, r*.75); faceSpr.renderOrder = 2; body.add(faceSpr);
   const shadow = new THREE.Mesh(new THREE.CircleGeometry(r, 10), new THREE.MeshBasicMaterial({ color:0, transparent:true, opacity:.35, depthWrite:false })); shadow.rotation.x = -Math.PI/2; shadow.position.y = .02; root.add(shadow);
   const halo = new THREE.Mesh(new THREE.TorusGeometry(.5, .08, 4, 12), new THREE.MeshBasicMaterial({ color:0xfff2cf })); halo.rotation.x = Math.PI/2; halo.position.y = r*2.1; halo.visible = false; body.add(halo);
+  // 蛋壳（被关）+ 救援进度点
+  const shell = new THREE.Group(); shell.visible = false; root.add(shell);
+  const shellMat = toon(0xfff6e0);
+  const low = new THREE.Mesh(new THREE.SphereGeometry(r*1.3, 10, 6, 0, Math.PI*2, Math.PI*.5, Math.PI*.5), shellMat); low.position.y = r*1.05; shell.add(low);
+  const lowO = new THREE.Mesh(low.geometry, OUT); lowO.scale.setScalar(1.06); low.add(lowO);
+  for (let i=0;i<8;i++) { const tooth = new THREE.Mesh(new THREE.ConeGeometry(r*.28, r*.45, 4), shellMat); const a = i/8*Math.PI*2; tooth.position.set(Math.cos(a)*r*1.12, r*1.2, Math.sin(a)*r*1.12); shell.add(tooth); }
+  const cap = new THREE.Mesh(new THREE.SphereGeometry(r*1.1, 10, 5, 0, Math.PI*2, 0, Math.PI*.38), shellMat); cap.position.set(r*.5, r*2.05, -r*.2); cap.rotation.z = -.7; shell.add(cap);
+  const pips = []; for (let i=0;i<12;i++) { const a = i/12*Math.PI*2; const pp = new THREE.Mesh(new THREE.BoxGeometry(.28,.08,.28), new THREE.MeshBasicMaterial({ color:0x53e3b7 })); pp.position.set(Math.cos(a)*1.75, .06, Math.sin(a)*1.75); pp.visible = false; root.add(pp); pips.push(pp); }
   scene.add(root);
-  return { root, body, bodyMat, wingMat, wings, shadow, faceSpr, muscle, halo, mats, outM, tag:null, ghostA:1 };
+  return { root, body, bodyMat, wingMat, wings, shadow, faceSpr, muscle, halo, mats, outM, tag:null, ghostA:1, shell, pips };
 }
 function buildHawk(faceTex){
   const root = new THREE.Group(), body = new THREE.Group(); root.add(body);
@@ -394,6 +506,11 @@ const SFX = {
   win(){ [523,659,784,1046].forEach((f,i) => tone(f,.16,'square',null,.08,i*.12)); },
   lose(){ [523,392,330,262].forEach((f,i) => tone(f,.18,'square',null,.08,i*.13)); },
   beat(){ tone(70,.12,'sine',45,.2); },
+  flip(){ tone(240,.08,'square',90,.1); noise(.06,.08); },
+  whoosh(){ noise(.2,.07); tone(300,.2,'sine',1200,.05); },
+  ding(i){ tone(880*Math.pow(1.19, i),.12,'square',null,.07); },
+  clang(){ tone(1600,.25,'triangle',1500,.08); tone(2400,.2,'triangle',null,.05,.02); },
+  spin(){ tone(1100,.05,'square',700,.05); },
 };
 
 /* ---------------- face tracking ---------------- */
@@ -624,7 +741,7 @@ function hostGone(){ if (Net.role !== 'client') return; netLeave(); toMenu('房�
    SIMULATION (host / solo only)
    ===================================================================== */
 const S = { phase:'lobby', t:0, countT:0, endT:0, round:0, ents:[], items:[], eggs:[], evq:[], evSeq:0, nextId:1, hbT:0, itemT:2, res:null, slow:0 };
-function ev(type, x=0, z=0, a=0, s=''){ const seq = ++S.evSeq; S.evq.push([seq, type, r2(x), r2(z), a, s]); if (S.evq.length > 30) S.evq.shift(); fx(type, x, z, a, s); }
+function ev(type, x=0, z=0, a=0, s=''){ if (SIM) { simLogEv(type, a); return; } const seq = ++S.evSeq; S.evq.push([seq, type, r2(x), r2(z), a, s]); if (S.evq.length > 30) S.evq.shift(); fx(type, x, z, a, s); }
 function mkEnt(kind, pid, name){
   return { id:S.nextId++, kind, pid, name, x:0, z:0, y:kind==='hawk'?MOTION.hawkHeight:0, vx:0, vz:0, vy:0, air:false, hopCd:0, sq:0, sqv:0,
     hearts:GAME.hearts, out:false, inv:0, knock:0, buff:'', buffT:0, life:0, ang:rnd(0,6.3),
@@ -638,28 +755,39 @@ function startRound(){
   const hawkP = humans.length >= 2 ? humans[(S.round-1) % humans.length] : null;
   Object.assign(S, { phase:'count', countT:3.4, t:0, endT:0, ents:[], items:[], evq:[], nextId:1, hbT:GAME.hawkBuffEvery, itemT:2.5, res:null, slow:0 });
   const hawk = mkEnt('hawk', hawkP ? hawkP.pid : null, hawkP ? hawkP.name : '电脑老鹰');
-  hawk.x = 0; hawk.z = -8; hawk.tx = 0; hawk.tz = -8; S.ents.push(hawk);
+  hawk.power = 1 + GAME.hawkScale*Math.max(0, Math.max(GAME.minChicks, humans.length - (hawkP ? 1 : 0)) - 3);
+  hawk.x = 0; hawk.z = GAME.hawkSpawnZ; hawk.tx = 0; hawk.tz = GAME.hawkSpawnZ; hawk.cd = GAME.hawkStartCd; S.ents.push(hawk);
   const chickPs = humans.filter(p => p !== hawkP);
   const n = Math.max(GAME.minChicks, chickPs.length), ai = ['小黄','小绒','小豆','小米'];
   for (let i=0;i<n;i++) {
     const p = chickPs[i]; const e = mkEnt('chick', p ? p.pid : null, p ? p.name : ai[i % ai.length]);
-    e.x = (i - (n-1)/2)*2.4; e.z = 9.5; S.ents.push(e);
+    e.x = (i - (n-1)/2)*2.4; e.z = 11; S.ents.push(e);
   }
   for (const p of humans) { p.hopSeen = -1; }
-  S.eggs = Array.from({length:GAME.eggs}, () => 0).map(() => ({ alive:false, t:rnd(.5,1.5), x:0, z:0, born:0 }));
+  S.map = { spin:MAP.spinners.map(() => 0), flip:MAP.flippers.map(f => f.rest), flipW:MAP.flippers.map(() => 0), tg:Array(MAP.targets.n).fill(0), tgReset:0 };
+  S.eggs = Array.from({length:GAME.eggs}, () => 0).map(() => ({ alive:false, t:rnd(.5,2.5), x:0, z:0, born:0 }));
   S.ents.forEach(e => e.st.score = 0);
 }
 function inputFor(e){
   if (!e.pid) return null;
+  if (SIM && e.pid.startsWith('bot')) return e.kind === 'hawk' ? botHawk(e) : botChick(e);
   if (e.pid === Net.myId) { const [x, z] = localTarget(); const hop = localHop > (e.hopSeenLocal ?? localHop); e.hopSeenLocal = localHop; return { x, z, hop }; }
   const p = players.get(e.pid); if (!p) return null;
   const hop = p.hopSeen !== -1 && p.hop > p.hopSeen; p.hopSeen = p.hop;
   return { x:p.ix, z:p.iz, hop };
 }
+function blocked(x, z){
+  if (BUMPERS.some(b => len(b.x-x, b.z-z) < 1.8)) return true;
+  if (MAP.spinners.some(sp => len(sp.x-x, sp.z-z) < sp.len + 1)) return true;
+  if (MAP.lanes.some(l => Math.abs(l.x-x) < l.w/2+.6 && Math.abs(l.z-z) < l.l/2+.6)) return true;
+  const T = MAP.tunnel; if (x > T.x0-.8 && x < T.x1+.8 && z > T.z0-.8 && z < T.z1+.8) return true;
+  if (z > 11.8 || x < MAP.targets.x + 1.5) return true;
+  return false;
+}
 function freeSpot(minD=2.5){
   for (let k=0;k<40;k++) {
     const x = rnd(-HW+1, HW-1), z = rnd(-HL+1, HL-1);
-    if (BUMPERS.some(b => len(b.x-x, b.z-z) < 1.8)) continue;
+    if (blocked(x, z)) continue;
     if (S.ents.some(e => e.kind !== 'hawk' && len(e.x-x, e.z-z) < minD)) continue;
     if (S.items.some(i => len(i.x-x, i.z-z) < 2)) continue;
     if (S.eggs.some(g => g.alive && len(g.x-x, g.z-z) < 1.6)) continue;
@@ -675,6 +803,8 @@ function aiChick(e){
     if (d < 2.6) { const k = 3.2; tx = e.x + (e.x-h.tx)/d*k; tz = e.z + (e.z-h.tz)/d*k; if (h.state === 'dive' && d < 1.4 && Math.random() < .6) hop = true;
       return [clamp(tx, -HW+.8, HW-.8), clamp(tz, -HL+.8, HL-.8), hop]; }
   }
+  const trap = S.ents.find(o => o.kind === 'chick' && o.out && (!h || len(h.x-o.x, h.z-o.z) > 3.5));
+  if (trap) return [clamp(trap.x, -HW+.8, HW-.8), clamp(trap.z, -HL+.8, HL-.8), false];
   let best = null, bd = 1e9;
   for (const i of S.items) { const d = len(i.x-e.x, i.z-e.z)*.8; if (d < bd) { bd = d; best = i; } }
   for (const g of S.eggs) if (g.alive) { const d = len(g.x-e.x, g.z-e.z); if (d < bd) { bd = d; best = g; } }
@@ -690,10 +820,18 @@ function stepChick(e, dt){
   if (!e.out && S.phase === 'play' && e.kind === 'chick') e.st.alive += dt;
   const inp = inputFor(e);
   let tx, tz, hop;
-  if (inp) { tx = inp.x; tz = inp.z; hop = inp.hop; } else [tx, tz, hop] = aiChick(e);
+  if (inp) { tx = inp.x; tz = inp.z; hop = inp.hop; }
+  else if (e.kind === 'chick') { const b = botChick(e); tx = b.x; tz = b.z; hop = b.hop; }
+  else [tx, tz, hop] = aiChick(e);
   if (S.phase !== 'play' && S.phase !== 'end') hop = false;
+  if (e.out) {
+    e.vx *= .8; e.vz *= .8; e.x += e.vx*dt; e.z += e.vz*dt; e.y = 0; e.air = false;
+    if (hop && S.t - (e.helpAt || -9) > 1) { e.helpAt = S.t; ev('help', e.x, e.z, 0, e.pid || ''); e.sq = .4; }
+    e.sqv += (-e.sq*MOTION.squashSpring - e.sqv*MOTION.squashDamp)*dt; e.sq += e.sqv*dt;
+    return;
+  }
   const muscle = e.buff === 'muscle', speed = e.buff === 'speed';
-  let k = e.knock > 0 ? 6 : speed ? 70 : muscle ? 32 : 42, c = e.knock > 0 ? 1.5 : speed ? 11 : 9.5, cap = speed ? 21 : muscle ? 12 : 15;
+  let k = e.knock > 0 ? 6 : speed ? 70 : muscle ? 32 : 42, c = e.knock > 0 ? 1.5 : speed ? 11 : 9.5, cap = speed ? MOTION.chickSpeedBuff : muscle ? MOTION.chickSpeedMuscle : MOTION.chickSpeed;
   if (e.out) { k = 18; c = 6; cap = 9; }
   e.vx += ((tx-e.x)*k - e.vx*c)*dt; e.vz += ((tz-e.z)*k - e.vz*c)*dt;
   const sp = len(e.vx, e.vz); if (sp > cap) { e.vx *= cap/sp; e.vz *= cap/sp; }
@@ -706,18 +844,72 @@ function stepChick(e, dt){
     if (d < rr && d > 1e-4) {
       const nx = dx/d, nz = dz/d; e.x = b.x + nx*rr; e.z = b.z + nz*rr;
       const vn = e.vx*nx + e.vz*nz; if (vn < 0) { e.vx -= 2*vn*nx; e.vz -= 2*vn*nz; }
-      e.vx += nx*11; e.vz += nz*11; e.knock = .28; e.sq = .45;
+      e.vx += nx*MOTION.bumperKick; e.vz += nz*MOTION.bumperKick; e.knock = .28; e.sq = .45;
       ev('bump', b.x+nx*b.r, b.z+nz*b.r, b.i);
     }
   }
+  mapPhysics(e, dt);
   if (hop && !e.out && !e.air && e.hopCd <= 0) { e.vy = MOTION.hopVelocity * (muscle ? .85 : 1); e.air = true; e.sq = MOTION.takeoffStretch; e.sqv = 0; ev('hop', e.x, e.z, 0, e.pid || ''); }
   if (e.air) {
     e.vy -= MOTION.gravity*dt; e.y += e.vy*dt;
     if (e.y <= 0) { e.y = 0; e.air = false; e.vy = 0; e.sq = MOTION.landSquash*(muscle ? 1.3 : 1); e.sqv = 0; e.hopCd = .12;
       if (muscle) { ev('stomp', e.x, e.z); for (const o of S.ents) if (o !== e && o.kind !== 'hawk' && !o.out && len(o.x-e.x, o.z-e.z) < 2.6) { const d = len(o.x-e.x, o.z-e.z) || .1; o.vx += (o.x-e.x)/d*12; o.vz += (o.z-e.z)/d*12; o.knock = .35; } } }
   }
-  if (e.out) e.y = lerp(e.y, 1.1 + Math.sin(S.t*3 + e.id)*.2, Math.min(1, dt*4));
   e.sqv += (-e.sq*MOTION.squashSpring - e.sqv*MOTION.squashDamp)*dt; e.sq += e.sqv*dt;
+}
+// 线段（可旋转）碰撞：挡板、风车臂
+function segHit(e, ax, az, bx, bz, th, px, pz, w, kick){
+  const r = rad(e), vx = bx-ax, vz = bz-az, L2 = vx*vx + vz*vz;
+  let t = L2 ? ((e.x-ax)*vx + (e.z-az)*vz)/L2 : 0; t = clamp(t, 0, 1);
+  const cx = ax + vx*t, cz = az + vz*t, dx = e.x-cx, dz = e.z-cz, d = len(dx, dz), rr = r + th;
+  if (d >= rr || d < 1e-4) return false;
+  const nx = dx/d, nz = dz/d; e.x = cx + nx*rr; e.z = cz + nz*rr;
+  const svx = -w*(cz-pz), svz = w*(cx-px);              // 接触点的表面速度 = ω × r
+  const rvx = e.vx - svx, rvz = e.vz - svz, vn = rvx*nx + rvz*nz;
+  if (vn < 0) { e.vx -= 1.8*vn*nx; e.vz -= 1.8*vn*nz; }
+  const push = Math.max(0, svx*nx + svz*nz);
+  e.vx += nx*(kick*.35 + push*.9); e.vz += nz*(kick*.35 + push*.9); e.knock = .3; e.sq = .5;
+  return push > 3 || -vn > 4;
+}
+function stepMap(dt){
+  const M = S.map;
+  MAP.spinners.forEach((sp, i) => M.spin[i] += sp.w*dt);
+  MAP.flippers.forEach((f, i) => { const a = flipAngle(f, S.t); M.flipW[i] = (a - M.flip[i])/Math.max(dt, 1e-4); M.flip[i] = a; });
+  if (M.tgReset > 0) { M.tgReset -= dt; if (M.tgReset <= 0) M.tg = M.tg.map(() => 0); }
+}
+function mapPhysics(e, dt){
+  const M = S.map; if (!M) return;
+  e.laneCd = Math.max(0, (e.laneCd || 0) - dt); e.tunnelCd = Math.max(0, (e.tunnelCd || 0) - dt);
+  if (e.y < .7) {
+    MAP.spinners.forEach((sp, i) => { for (let k=0;k<3;k++) { const a = M.spin[i] + k*Math.PI*2/3;
+      if (segHit(e, sp.x, sp.z, sp.x + Math.cos(a)*sp.len, sp.z + Math.sin(a)*sp.len, .25, sp.x, sp.z, sp.w, MOTION.spinKick)) ev('spin', e.x, e.z, i); } });
+    MAP.flippers.forEach((f, i) => { const a = M.flip[i];
+      if (segHit(e, f.px, f.pz, f.px + Math.cos(a)*f.len, f.pz + Math.sin(a)*f.len, .35, f.px, f.pz, M.flipW[i], 2) && Math.abs(M.flipW[i]) > 3) { e.vz -= MOTION.flipKick; e.knock = .5; ev('flip', e.x, e.z, i); } });
+    for (const ln of MAP.lanes) if (e.laneCd <= 0 && Math.abs(e.x-ln.x) < ln.w/2 && Math.abs(e.z-ln.z) < ln.l/2) {
+      e.vx *= .3; e.vz = ln.dz*MOTION.laneBoost; e.knock = .35; e.laneCd = .9; e.sq = -.4; ev('lane', e.x, e.z, 0, e.pid || ''); }
+  }
+  if (e.kind === 'chick' && !e.out) {
+    const T = MAP.targets;
+    for (let i=0;i<T.n;i++) if (!M.tg[i] && M.tgReset <= 0 && len(e.x - T.x, e.z - (T.z0 + i*T.gap)) < 1.05) {
+      M.tg[i] = 1; e.st.score += GAME.targetPts; ev('target', T.x, T.z0 + i*T.gap, i, e.pid || '');
+      if (M.tg.every(Boolean)) {
+        M.tgReset = 2; for (const o of S.ents) if (o.kind === 'chick' && !o.out) o.st.score += GAME.jackpotPts;
+        S.items.push({ id:S.nextId++, x:-6.5, z:T.z0 + T.gap*2, born:S.t }); ev('jackpot', -6.5, T.z0 + T.gap*2);
+      }
+    }
+    if (inTunnel(e) && e.tunnelCd <= 0) { e.tunT = (e.tunT || 0) + dt;
+      if (e.tunT > MOTION.tunnelMax) { e.tunT = 0; e.tunnelCd = MOTION.tunnelCd; e.vx = -14; e.knock = .5; ev('eject', e.x, e.z, 0, e.pid || ''); } }
+    else e.tunT = Math.max(0, (e.tunT || 0) - dt*2);
+  }
+}
+function stepRescue(dt){
+  for (const e of S.ents) {
+    if (e.kind !== 'chick' || !e.out) continue;
+    const helper = S.ents.find(o => o.kind === 'chick' && !o.out && len(o.x-e.x, o.z-e.z) < MOTION.rescueRadius);
+    if (helper) { e.resc = (e.resc || 0) + dt/MOTION.rescueTime;
+      if (e.resc >= 1) { e.out = false; e.hearts = 1; e.inv = 2; e.resc = 0; helper.st.rescues = (helper.st.rescues || 0) + 1; helper.st.score += GAME.rescuePts; ev('revive', e.x, e.z, 0, (helper.pid || '') + '|' + helper.name + '|' + (e.pid || '') + '|' + e.name); } }
+    else e.resc = Math.max(0, (e.resc || 0) - dt*.6);
+  }
 }
 const rad = e => e.kind === 'hawk' ? .75 : (e.buff === 'muscle' ? .8*MOTION.muscleScale : .8);
 function stepHawk(h, dt){
@@ -736,11 +928,11 @@ function stepHawk(h, dt){
   if (h.state === 'fly') {
     if (h.stun > 0) { h.vx *= .9; h.vz *= .9; }
     else { h.vx += ((tx-h.x)*16 - h.vx*6.5)*dt; h.vz += ((tz-h.z)*16 - h.vz*6.5)*dt; }
-    const sp = len(h.vx, h.vz), cap = MOTION.hawkFly; if (sp > cap) { h.vx *= cap/sp; h.vz *= cap/sp; }
+    const sp = len(h.vx, h.vz), cap = MOTION.hawkFly*(h.power || 1); if (sp > cap) { h.vx *= cap/sp; h.vz *= cap/sp; }
     h.x += h.vx*dt; h.z += h.vz*dt; h.y = lerp(h.y, MOTION.hawkHeight + Math.sin(S.t*2)*.25, Math.min(1, dt*5));
     if (hop && h.cd <= 0 && h.stun <= 0) {
       h.state = 'aim'; h.aimDur = h.hb === 'quick' ? MOTION.hawkAimQuick : MOTION.hawkAim; h.t = h.aimDur; h.tx = h.x; h.tz = h.z; h.aimAt = S.t;
-      for (const e of S.ents) e.react = rnd(.12, .45);
+      for (const e of S.ents) e.react = rnd(...MOTION.aiReact);
       ev('aim', h.x, h.z);
     }
   } else if (h.state === 'aim') {
@@ -748,7 +940,7 @@ function stepHawk(h, dt){
     if (d > step) { h.tx += dx/d*step; h.tz += dz/d*step; } else { h.tx = tx; h.tz = tz; }
     h.x = lerp(h.x, h.tx, Math.min(1, dt*10)); h.z = lerp(h.z, h.tz, Math.min(1, dt*10)); h.vx = h.vz = 0;
     h.y = MOTION.hawkHeight + (1 - h.t/h.aimDur)*1.3;
-    if (h.t <= 0) { h.state = 'dive'; h.t = MOTION.hawkDive; h.sy = h.y; ev('dive', h.tx, h.tz); }
+    if (h.t <= 0) { h.state = 'dive'; h.t = MOTION.hawkDive; h.sy = h.y; h.diveAt = S.t; ev('dive', h.tx, h.tz); }
   } else if (h.state === 'dive') {
     const p = clamp(1 - h.t/MOTION.hawkDive, 0, 1); h.x = h.tx; h.z = h.tz; h.y = lerp(h.sy, .7, easeInCubic(p));
     if (h.t <= 0) { impact(h); if (h.state === 'dive') { h.state = 'rise'; h.t = MOTION.hawkRise; } }
@@ -759,8 +951,8 @@ function stepHawk(h, dt){
   }
 }
 function impact(h){
-  ev('impact', h.tx, h.tz);
-  const claw = h.hb === 'claw', R = MOTION.hitRadius*(claw ? MOTION.clawMul : 1);
+  ev('impact', h.tx, h.tz); h.clanged = false;
+  const claw = h.hb === 'claw', R = MOTION.hitRadius*(claw ? MOTION.clawMul : 1)*(h.power || 1);
   if (h.hbN > 0) { h.hbN--; if (h.hbN <= 0) h.hb = ''; }
   if (S.phase !== 'play') return;
   let punched = false;
@@ -768,6 +960,7 @@ function impact(h){
     if (e.kind === 'hawk' || e.out || e.dead) continue;
     const d = len(e.x-h.tx, e.z-h.tz);
     if (d >= R) { if (e.kind === 'chick' && d < MOTION.nearRadius + (claw ? .8 : 0) && e.inv <= 0) { e.st.score += 3; ev('near', e.x, e.z, 3, e.pid || ''); } continue; }
+    if (inTunnel(e) && (e.tunnelCd || 0) <= 0) { if (!h.clanged) { h.clanged = true; h.stun = Math.max(h.stun, .35); ev('clang', e.x, e.z); } continue; }
     if (e.kind === 'decoy') { e.dead = true; h.stun = Math.max(h.stun, MOTION.fakeStun); ev('fake', e.x, e.z, 0, h.pid || ''); continue; }
     if (e.buff === 'muscle') {
       punched = true; e.st.punches++; e.st.score += GAME.punchPts;
@@ -779,11 +972,12 @@ function impact(h){
     if (e.inv > 0) continue;
     e.hearts--; e.inv = 1.4; e.knock = .45; const dd = d || .1; e.vx = (e.x-h.tx)/dd*12; e.vz = (e.z-h.tz)/dd*12; e.sq = .7;
     h.st.hits++; h.st.score += GAME.hitPts; S.slow = MOTION.hitSlowmo;
-    if (e.hearts <= 0) { e.out = true; e.buff = ''; e.buffT = 0; h.st.catches++; h.st.score += GAME.catchPts; ev('out', e.x, e.z, 0, (e.pid || '') + '|' + e.name); }
+    if (e.hearts <= 0) { e.out = true; e.resc = 0; e.vx *= .3; e.vz *= .3; e.buff = ''; e.buffT = 0; h.st.catches++; h.st.score += GAME.catchPts; ev('out', e.x, e.z, 0, (e.pid || '') + '|' + e.name); }
     else ev('hit', e.x, e.z, e.hearts, (e.pid || '') + '|' + e.name);
   }
   if (punched) { h.state = 'rise'; h.t = MOTION.hawkRise*1.4; }
-  if (!S.ents.some(e => e.kind === 'chick' && !e.out)) endRound('hawk');
+  { const ch = S.ents.filter(e => e.kind === 'chick'), outN = ch.filter(e => e.out).length;
+    if (outN >= Math.max(1, Math.ceil(ch.length*GAME.hawkWinFrac))) endRound('hawk'); }
 }
 function collideChicks(){
   const list = S.ents.filter(e => e.kind !== 'hawk' && !e.out && !e.dead && e.y < .8);
@@ -802,7 +996,7 @@ function stepPickups(dt){
   for (const g of S.eggs) {
     if (!g.alive) { g.t -= dt; if (g.t <= 0) { [g.x, g.z] = freeSpot(); g.alive = true; g.born = S.t; } continue; }
     const e = S.ents.find(e => e.kind === 'chick' && !e.out && e.y < 1.2 && len(e.x-g.x, e.z-g.z) < 1.05);
-    if (e) { g.alive = false; g.t = rnd(.6, 1.6); e.st.eggs++; e.combo = S.t - (e.lastEgg ?? -9) < 2.5 ? Math.min(4, (e.combo || 1)+1) : 1; e.lastEgg = S.t;
+    if (e) { g.alive = false; g.t = rnd(...GAME.eggRespawn); e.st.eggs++; e.combo = S.t - (e.lastEgg ?? -9) < 2.5 ? Math.min(4, (e.combo || 1)+1) : 1; e.lastEgg = S.t;
       const pts = GAME.eggPts*e.combo; e.st.score += pts; ev('egg', g.x, g.z, pts, (e.pid || '') + '|' + e.combo); e.sq = .3; }
   }
   S.itemT -= dt;
@@ -823,6 +1017,7 @@ function stepPickups(dt){
 function hostStep(dt){
   if (S.phase === 'count') {
     S.countT -= dt;
+    stepMap(dt);
     for (const e of S.ents) if (e.kind === 'hawk') stepHawk(e, dt); else stepChick(e, dt);
     if (S.countT <= -.3) S.phase = 'play';
     return;
@@ -833,12 +1028,14 @@ function hostStep(dt){
     S.hbT -= dt;
     const h = hawkEnt();
     if (S.hbT <= 0 && h) { S.hbT = GAME.hawkBuffEvery; h.hb = HB_KEYS[Math.floor(Math.random()*HB_KEYS.length)]; h.hbN = 2; ev('hbuff', h.x, h.z, HB_KEYS.indexOf(h.hb), h.pid || ''); }
-    stepPickups(dt);
+    stepPickups(dt); stepRescue(dt);
   } else S.endT += dt;
+  stepMap(dt);
   for (const e of S.ents) if (e.kind === 'hawk') stepHawk(e, dt); else stepChick(e, dt);
   collideChicks();
   S.ents = S.ents.filter(e => !e.dead);
-  if (S.phase === 'play' && S.t >= GAME.dur) endRound('chicks');
+  if (S.phase === 'play' && S.t >= GAME.dur) { const ch = S.ents.filter(e => e.kind === 'chick'), outN = ch.filter(e => e.out).length;
+    endRound(outN >= Math.max(1, Math.ceil(ch.length*GAME.timeupHawkFrac)) ? 'hawk' : 'chicks'); }
 }
 function endRound(win){
   if (S.phase !== 'play') return;
@@ -848,7 +1045,7 @@ function endRound(win){
     if (e.kind === 'decoy') continue;
     let line, score = Math.round(e.st.score);
     if (e.kind === 'hawk') line = `抓到 ${e.st.catches} · 啄中 ${e.st.hits}`;
-    else { score += Math.round(e.st.alive)*(e.out ? 1 : 2); line = `${e.out ? '被抓' : '存活'} · 金蛋 ${e.st.eggs} · 闪避 ${e.st.dodges}${e.st.punches ? ` · 打飞 ${e.st.punches}` : ''}`; }
+    else { score += Math.round(e.st.alive)*(e.out ? 1 : 2); line = `${e.out ? '被关' : '自由'} · 救人 ${e.st.rescues || 0} · 金蛋 ${e.st.eggs}${e.st.dodges ? ` · 闪避 ${e.st.dodges}` : ''}${e.st.punches ? ` · 打飞 ${e.st.punches}` : ''}`; }
     rows.push([e.pid || '', e.name, e.kind === 'hawk' ? 1 : 0, score, line, e.pid ? '' : 'ai' + e.id]);
   }
   let mvp = 0; rows.forEach((r, i) => { if (r[3] > rows[mvp][3]) mvp = i; });
@@ -861,7 +1058,8 @@ function buildSnap(){
     e:S.ents.map(e => [e.id, KIND[e.kind], e.pid || '', e.name, r2(e.x), r2(e.z), r2(e.y),
       (e.out?1:0)|(e.air?2:0)|(e.inv>0?4:0)|(e.stun>0?8:0)|(e.hb==='claw'?16:0)|(e.hb==='quick'?32:0),
       e.hearts, e.buff ? BUFF_KEYS.indexOf(e.buff)+1 : 0, r2(e.buffT), HST[e.state] || 0, r2(e.tx), r2(e.tz),
-      e.state === 'aim' ? r2(1 - e.t/e.aimDur) : 0, r2(e.sq), r2(e.vx), r2(e.vz), r2(e.cd), e.faceKey || (e.pid ? '' : 'ai' + e.id), Math.round(e.st.score)]),
+      e.state === 'aim' ? r2(1 - e.t/e.aimDur) : 0, r2(e.sq), r2(e.vx), r2(e.vz), r2(e.cd), e.faceKey || (e.pid ? '' : 'ai' + e.id), Math.round(e.st.score), r2(e.resc || 0), inTunnel(e) ? 1 : 0]),
+    mp:S.map ? [...S.map.spin.map(r2), ...S.map.flip.map(r2), S.map.tg.reduce((a,b,i) => a | (b << i), 0)] : null,
     it:S.items.map(i => [i.id, r2(i.x), r2(i.z)]),
     eg:S.eggs.filter(g => g.alive).map(g => [r2(g.x), r2(g.z)]),
     ev:S.evq.slice(-16), res:S.res };
@@ -879,9 +1077,10 @@ function applySnap(sn, local){
   const roundChanged = sn.rd !== W.rd; W.rd = sn.rd;
   W.items = Array.isArray(sn.it) ? sn.it : []; W.eggs = Array.isArray(sn.eg) ? sn.eg : [];
   W.res = sn.res || null;
+  W.mp = Array.isArray(sn.mp) ? sn.mp.map(Number) : null;
   const seen = new Set();
   W.ents = (Array.isArray(sn.e) ? sn.e : []).map(a => {
-    const [id, k, pid, name, x, z, y, fl, hearts, bf, bt, st, tx, tz, ap, sq, vx, vz, cd, fk, score] = a;
+    const [id, k, pid, name, x, z, y, fl, hearts, bf, bt, st, tx, tz, ap, sq, vx, vz, cd, fk, score, resc, tun] = a;
     seen.add(id);
     let v = views.get(id);
     if (!v || roundChanged && !local) {
@@ -890,7 +1089,7 @@ function applySnap(sn, local){
       v.dx = +x; v.dz = +z; v.dy = +y; views.set(id, v);
     }
     Object.assign(v, { x:+x, z:+z, y:+y, out:!!(fl&1), air:!!(fl&2), inv:!!(fl&4), stun:!!(fl&8), claw:!!(fl&16), quick:!!(fl&32),
-      hearts:+hearts, buff:bf ? BUFF_KEYS[bf-1] : '', buffT:+bt, state:['fly','aim','dive','rise'][st] || 'fly', tx:+tx, tz:+tz, aimP:+ap, sq:+sq, vx:+vx, vz:+vz, cd:+cd, score:+score, name:String(name).slice(0,12) });
+      hearts:+hearts, buff:bf ? BUFF_KEYS[bf-1] : '', buffT:+bt, state:['fly','aim','dive','rise'][st] || 'fly', tx:+tx, tz:+tz, aimP:+ap, sq:+sq, vx:+vx, vz:+vz, cd:+cd, score:+score, resc:+resc || 0, tun:!!tun, name:String(name).slice(0,12) });
     if (local) { v.dx = v.x; v.dz = v.z; v.dy = v.y; }
     return v;
   });
@@ -938,9 +1137,9 @@ function fx(type, x, z, a, s){
     case 'dodge': popup(x, 2.4, z, `闪避 +${a}`, '#53e3b7'); if (mine) { callout('闪避！', '#53e3b7'); SFX.dodge(); } break;
     case 'hit': case 'out': {
       burst(x, 1, z, 30, [0xffffff, 0xffd23f, 0xffe9a8], 7, 1, 9, 1.2); SFX.hit();
-      if (mine) { shake = MOTION.hitShake; punch = 1; redFlash = 1; flashCol = '255,90,60'; callout(type === 'out' ? '被叼走了…' : '被啄了！', '#ff5a3c'); }
+      if (mine) { shake = MOTION.hitShake; punch = 1; redFlash = 1; flashCol = '255,90,60'; callout(type === 'out' ? '被关进蛋壳了！' : '被啄了！', '#ff5a3c'); }
       else if (me && me.k === 1) { callout(type === 'out' ? `抓到 ${who}！` : `啄中 ${who}！`, '#ffd23f'); shake = .4; punch = .6; }
-      else callout(type === 'out' ? `${who} 被叼走了！` : `${who} 被啄了`, '#ff8fb3', 44);
+      else callout(type === 'out' ? `${who} 被关进蛋壳！快去救` : `${who} 被啄了`, '#ff8fb3', 44);
       break;
     }
     case 'punch': {
@@ -960,6 +1159,22 @@ function fx(type, x, z, a, s){
       break;
     }
     case 'hbuff': { const k = HB_KEYS[a] || 'claw'; SFX.claw(); callout(mine ? `你获得 ${HAWK_BUFFS[k].name}！` : `老鹰获得 ${HAWK_BUFFS[k].name}！`, HAWK_BUFFS[k].color, 44); break; }
+    case 'spin': burst(x, .7, z, 7, [0x7fe6ff, 0x2f6fd0], 5, .4); SFX.spin(); shake = Math.max(shake, .12); break;
+    case 'flip': burst(x, .5, z, 10, 0xf4f1e8, 6, .4); SFX.flip(); shake = Math.max(shake, .25); break;
+    case 'lane': burst(x, .3, z, 10, [0xd6ff3c, 0x5fcf3a], 4, .4, 4); if (mine || !s) SFX.whoosh(); break;
+    case 'target': burst(x, .9, z, 10, TCOL[a] || 0xffffff, 4, .4); SFX.ding(a); popup(x+1.2, 1.4, z, '+5', '#fff2cf'); break;
+    case 'jackpot': burst(x, 1, z, 40, TCOL, 8, 1, 8, 1.2); SFX.roulette(); setTimeout(() => SFX.win(), 200); callout('灯柱全亮！出现 ? 盒子', '#b4ff3c', 44); break;
+    case 'clang': SFX.clang(); burst(x, 2.2, z, 14, [0xb4ff3c, 0xfff2cf], 5, .5); popup(x, 2.6, z, '铛！隧道挡住了', '#b4ff3c'); break;
+    case 'eject': burst(x, .6, z, 12, 0xb4ff3c, 6, .5); SFX.flip(); if (mine) callout('在隧道待太久，被弹出来了', '#b4ff3c', 36); break;
+    case 'help': popup(x, 2.6, z, '救命！', '#53e3b7'); if (mine) SFX.near(); break;
+    case 'revive': {
+      const [hp, hn, vp, vn] = s.split('|'); burst(x, 1, z, 26, [0x53e3b7, 0xfff6e0, 0xffd23f], 6, .7); SFX.dodge();
+      if (vp === Net.myId) callout('被救出来了！', '#53e3b7');
+      else if (hp === Net.myId) callout(`救出 ${vn}！ +${GAME.rescuePts}`, '#53e3b7');
+      else if (me && me.k === 1) callout(`${vn} 被救走了`, '#ff8fb3', 40);
+      else popup(x, 2.4, z, `${hn} 救出 ${vn}`, '#53e3b7');
+      break;
+    }
     case 'shove': SFX.shove(); burst(x, .6, z, 6, 0xff8a3c, 4, .3); break;
     case 'win': {
       const meK = me ? me.k : -1, iWon = (a === 1) === (meK === 1);
@@ -1112,7 +1327,7 @@ function drawHUD(rdt){
     // role line
     if (me) {
       const isHawk = me.k === 1;
-      text(isHawk ? '你是老鹰' : me.out ? '你是小幽灵' : '你是小鸡', OW/2, 88, 20, isHawk ? '#ff5a3c' : me.out ? '#9be7ff' : '#ffd23f', 'center', 5);
+      text(isHawk ? '你是老鹰' : me.out ? '被关进蛋壳了' : '你是小鸡', OW/2, 88, 20, isHawk ? '#ff5a3c' : me.out ? '#53e3b7' : '#ffd23f', 'center', 5);
       if (isHawk) {
         const ready = me.cd <= 0 && !me.stun && me.state === 'fly';
         ctx.fillStyle = '#0b0817'; ctx.fillRect(OW/2-60, 104, 120, 14);
@@ -1120,8 +1335,9 @@ function drawHUD(rdt){
         text(me.stun ? '被打晕了！' : ready ? '张嘴 = 俯冲' : '…', OW/2, 132, 16, me.stun ? '#ff8a3c' : '#fff2cf', 'center', 4);
         if (me.claw || me.quick) text(me.claw ? '巨爪 ×2' : '闪电俯冲 ×2', OW/2, 154, 16, '#ffd23f', 'center', 4);
       } else {
-        for (let i=0;i<GAME.hearts;i++) heart(OW/2-26 + i*30, 104, i < me.hearts, 4);
-        if (me.buff && me.buff !== 'decoy') text(`${BUFFS[me.buff].name} ${Math.ceil(me.buffT)}`, OW/2, 142, 18, BUFFS[me.buff].color, 'center', 4);
+        if (me.out) { text('等队友来救 · 张嘴喊救命', OW/2, 116, 17, '#fff2cf', 'center', 4); ctx.fillStyle = '#0b0817'; ctx.fillRect(OW/2-60, 134, 120, 12); ctx.fillStyle = '#53e3b7'; ctx.fillRect(OW/2-58, 136, 116*me.resc, 8); }
+        else { const trapped = W.ents.filter(o => o.k === 0 && o.out).length; if (trapped) text(`${trapped} 只小鸡在蛋壳里，去救！`, OW/2, 112, 17, '#53e3b7', 'center', 4); else if (me.tun) text('隧道里老鹰扑不到你', OW/2, 112, 17, '#b4ff3c', 'center', 4); }
+        if (!me.out && me.buff && me.buff !== 'decoy') text(`${BUFFS[me.buff].name} ${Math.ceil(me.buffT)}`, OW/2, 142, 18, BUFFS[me.buff].color, 'center', 4);
       }
     }
     // scoreboard (right)
@@ -1159,7 +1375,7 @@ function drawHUD(rdt){
     ctx.save(); ctx.translate(OW/2, OH*.42); ctx.scale(sc*1.2, sc*1.2); text(n > 0 ? String(n) : '跑！', 0, 0, 96, '#ffd23f', 'center', 14); ctx.restore();
     const isHawk = me && me.k === 1;
     box(30, OH*.52, OW-60, 70, '#0b0817');
-    text(isHawk ? '你是老鹰：转头移动 · 张嘴锁定俯冲' : '你是小鸡：转头跑 · 张嘴跳 · 抢 ? 盒子', OW/2, OH*.52+24, 20, isHawk ? '#ff5a3c' : '#ffd23f', 'center', 4);
+    text(isHawk ? '你是老鹰：把所有小鸡都关进蛋壳就赢' : '你是小鸡：别被啄 · 队友被关就去救', OW/2, OH*.52+24, 20, isHawk ? '#ff5a3c' : '#ffd23f', 'center', 4);
     text(face.on ? (face.ok ? '正对屏幕，倒计时结束时自动校准' : '把脸放进摄像头画面') : IS_TOUCH ? '手指拖动移动 · 右下按钮跳' : '鼠标移动 · 点击 = 张嘴', OW/2, OH*.52+52, 16, '#9a8fc4', 'center', 4);
   }
   if (W.phase === 'play' && me) drawArrows(me);
@@ -1169,7 +1385,8 @@ function drawHUD(rdt){
 function drawArrows(me){
   // 画面外的对手：沿屏幕边缘画箭头 + 头像
   for (const v of W.ents) {
-    if (v === me || v.k === 2 || v.out) continue;
+    if (v === me || v.k === 2) continue;
+    if (v.out && (me.k === 1 || me.out)) continue;
     if (v.buff === 'ghost') continue;
     const enemy = (me.k === 1) !== (v.k === 1);
     if (!enemy && me.k !== 1) { /* teammates: only show if far */ }
@@ -1178,7 +1395,7 @@ function drawArrows(me){
     if (sx > mX && sx < OW-mX && sy > mT && sy < OH-mB) continue;
     const cx = OW/2, cy = OH/2, ang = Math.atan2(sy-cy, sx-cx);
     const ex = clamp(sx, mX, OW-mX), ey = clamp(sy, mT, OH-mB);
-    const col = v.k === 1 ? '#ff5a3c' : enemy ? '#ffd23f' : '#9a8fc4';
+    const col = v.out ? '#53e3b7' : v.k === 1 ? '#ff5a3c' : enemy ? '#ffd23f' : '#9a8fc4';
     ctx.save(); ctx.translate(ex, ey);
     ctx.save(); ctx.rotate(ang); ctx.fillStyle = '#0b0817'; ctx.beginPath(); ctx.moveTo(26,0); ctx.lineTo(4,-14); ctx.lineTo(4,14); ctx.closePath(); ctx.fill();
     ctx.fillStyle = col; ctx.beginPath(); ctx.moveTo(21,0); ctx.lineTo(7,-9); ctx.lineTo(7,9); ctx.closePath(); ctx.fill(); ctx.restore();
@@ -1186,6 +1403,7 @@ function drawArrows(me){
     ctx.imageSmoothingEnabled = false; ctx.drawImage(faceFor(v.k === 1 && !v.pid ? 'hawk-ai' : v.key).c, -12, -12, 24, 24);
     ctx.restore();
     if (v.k === 1 && (v.state === 'aim' || v.state === 'dive') && me.k !== 1) text('!', ex, ey-26, 22, '#ff5a3c', 'center', 5);
+    if (v.out) text('救', ex, ey-26, 18, '#53e3b7', 'center', 5);
   }
 }
 function drawCard(t){
@@ -1216,7 +1434,7 @@ function drawCard(t){
 
 /* ---------------- main loop ---------------- */
 let last = performance.now(), snapAcc = 0, inAcc = 0, faceAcc = 0, lastInKey = '';
-const CAM_BASE = new THREE.Vector3(0, 19, 12.5);
+const CAM_BASE = new THREE.Vector3(0, 21, 9.5);
 let camX = 0, camZ = 0;
 function frame(now){
   requestAnimationFrame(frame);
@@ -1281,7 +1499,7 @@ function frame(now){
 
   shake = Math.max(0, shake - rdt*1.8); punch = Math.max(0, punch - rdt*2.5);
   // 镜头跟随自己（大地图），限制在场地内
-  const fx0 = me ? clamp(me.dx, -HW+4.5, HW-4.5) : 0, fz0 = me ? clamp(me.dz, -HL+6.5, HL-6.5) : 0;
+  const fx0 = me ? clamp(me.dx, -HW+4.5, HW-4.5) : 0, fz0 = me ? clamp(me.dz, -HL+7.5, HL-5.5) : 0;
   const ov = W.phase === 'idle' || W.phase === 'lobby' || !me;
   camX = lerp(camX, ov ? 0 : fx0, Math.min(1, rdt*5)); camZ = lerp(camZ, ov ? 0 : fz0, Math.min(1, rdt*5));
   camera.fov = (ov ? 70 : 55) - easeOutCubic(punch)*MOTION.punchFov; camera.updateProjectionMatrix();
@@ -1296,7 +1514,7 @@ function frame(now){
 }
 function renderWorld(t, rdt){
   for (const v of W.ents) {
-    const m = v.mesh, isMe = v.pid && v.pid === Net.myId;
+    const m = v.mesh, isMe = !!(v.pid && v.pid === Net.myId);
     if (v.k === 1) {
       m.root.position.set(v.dx, v.dy, v.dz);
       m.faceSpr.visible = !!(v.pid && faces.get(v.pid)?.real);
@@ -1333,14 +1551,15 @@ function renderWorld(t, rdt){
       v.flex += rdt; const fp = (v.flex % MOTION.flexEvery)/MOTION.flexEvery, flex = fp < .5 ? easeOutBack(fp*2) : 1 - easeOutCubic((fp-.5)*2);
       m.muscle.children.forEach(ch => { if (ch.userData && ch.userData.elbow) { ch.rotation.z = ch.userData.s*(-.2 + flex*.5); ch.userData.elbow.rotation.z = ch.userData.s*(flex*1.4); } });
       m.bodyMat.color.set(0xffb347);
-    } else m.bodyMat.color.set(v.out ? 0xbfe7ff : 0xffd23f);
+    } else m.bodyMat.color.set(0xffd23f);
     const flap = v.air ? .9 + Math.sin(t*30)*.4 : (len(v.vx, v.vz) > 3 ? Math.abs(Math.sin(t*16))*.6 : .08);
     m.wings.forEach((w,i) => { w.rotation.z = (i ? 1 : -1)*flap; w.visible = !muscle; });
-    m.shadow.scale.setScalar(Math.max(.4, 1 - v.dy*.12)*sc);
-    m.halo.visible = v.out;
+    m.shadow.scale.setScalar(Math.max(.4, 1 - v.dy*.12)*sc*(v.out ? 1.3 : 1));
+    m.halo.visible = false;
+    m.shell.visible = v.out; if (v.out) { m.shell.rotation.z = Math.sin(t*20)*v.sq*.3; m.shell.rotation.y = t*.3; }
+    const np = v.out ? Math.floor(v.resc*12 + .001) : 0; m.pips.forEach((pp, i) => { pp.visible = v.out; pp.material.color.set(i < np ? 0x53e3b7 : 0x3a3450); });
     // transparency: ghost buff (others barely see), knocked out (ghost), invuln blink
     let a = 1;
-    if (v.out) a = .45;
     if (ghost) a = isMe || (v.k === 2 && v.key === Net.myId) ? .45 : .1;
     const blink = v.inv && !v.out && Math.floor(t*14) % 2 === 0;
     if (Math.abs(m.ghostA - a) > .01) { m.ghostA = a; m.mats.forEach(x => { x.transparent = a < 1; x.opacity = a; x.depthWrite = a >= 1; }); m.faceSpr.material.opacity = a; m.shadow.material.opacity = .35*a; }
@@ -1351,12 +1570,121 @@ function renderWorld(t, rdt){
   // items & eggs
   itemMeshes.forEach((m, i) => { const it = W.items[i]; m.visible = !!it; if (it) { m.position.set(it[1], .8 + Math.sin(t*3+i)*.15, it[2]); m.rotation.set(.3, t*2, 0); } });
   eggMeshes.forEach((m, i) => { const g = W.eggs[i]; m.visible = !!g; if (g) { m.position.set(g[0], .55 + Math.sin(t*3+i)*.12, g[1]); m.scale.set(1, 1.3, 1); m.rotation.y = t*1.5; } });
-  bumperMeshes.forEach((m,i) => { const f = BUMPERS[i].flash; m.cap.scale.set(1+f*.2, 1-f*.18, 1+f*.2); m.capMat.emissiveIntensity = f; });
+  bumperMeshes.forEach((m,i) => { const f = BUMPERS[i].flash; m.cap.scale.set(1+f*.25, 1+f*.6, 1+f*.25); m.capMat.emissiveIntensity = f; });
+  const mp = W.mp, nS = MAP.spinners.length, nF = MAP.flippers.length;
+  spinnerMeshes.forEach((m, i) => m.rot.rotation.y = -(mp ? mp[i] : t*MAP.spinners[i].w));
+  flipperMeshes.forEach((g, i) => g.rotation.y = -(mp ? mp[nS+i] : flipAngle(MAP.flippers[i], t)));
+  const tg = mp ? mp[nS+nF] : 0;
+  targetMeshes.forEach((tm, i) => { const down = (tg >> i) & 1; tm.m.position.y = lerp(tm.m.position.y, down ? .22 : .75, Math.min(1, rdt*12)); tm.mat.emissiveIntensity = down ? .05 : .3 + Math.sin(t*4 + i)*.15; });
+  laneMeshes.forEach((m, i) => m.material.emissiveIntensity = .15 + (Math.floor(t*6 + i) % 3 === 0 ? .5 : 0));
+  tunnelMesh.glow.material.opacity = .12 + Math.sin(t*3)*.04;
 }
 function lerpAngle(a, b, t){ let d = b - a; d = Math.atan2(Math.sin(d), Math.cos(d)); return a + d*t; }
 
 // AI hawk face for scoreboard
 { const f = faceFor('hawk-ai'); const g = f.c.getContext('2d'); g.clearRect(0,0,FPX,FPX); g.fillStyle = '#8e5530'; g.beginPath(); g.arc(12,12,12,0,7); g.fill(); g.fillStyle = '#fff2cf'; g.fillRect(5,4,14,7); g.fillStyle = '#0b0817'; g.fillRect(6,9,5,2); g.fillRect(13,9,5,2); g.fillRect(8,11,2,3); g.fillRect(14,11,2,3); g.fillStyle = '#ffc23d'; g.fillRect(10,14,4,4); g.fillRect(11,18,2,2); circleMaskAndQuantize(f.c); f.tex.needsUpdate = true; }
+
+/* =====================================================================
+   自动对战模拟（只在 ?sim=N 时运行）：机器人按「真人用脸操作」的反应延迟和误差打 N 局，统计平衡数据
+   ===================================================================== */
+const HUMAN = { rescueBrave:3, tunnelSeek:6, chickReact:[.32,.55], hopPlan:[-.22,.45], hopTry:.75, aimNoise:.7, hawkLatency:[.15,.3], hawkTrigger:1.1, avoidMuscle:.5 };
+let simLog = null;
+function simLogEv(type, a){
+  if (!simLog) return;
+  const L = simLog;
+  L[type] = (L[type] || 0) + 1;
+  if (type === 'buff') { const k = BUFF_KEYS[a]; L.buffs[k] = (L.buffs[k] || 0) + 1; }
+  if ((type === 'hit' || type === 'out') && L.firstHit === null) L.firstHit = S.t;
+  if (type === 'out') L.maxTrapped = Math.max(L.maxTrapped || 0, S.ents.filter(e => e.kind === 'chick' && e.out).length);
+}
+function botChick(e){
+  const h = hawkEnt();
+  if (e.botN === undefined) { e.botN = rnd(0, 10); e.botNx = 0; e.botNz = 0; }
+  e.botN += 1/60;
+  // 人脸操作的位置误差：缓慢漂移的噪声
+  e.botNx = lerp(e.botNx, rnd(-1,1)*HUMAN.aimNoise, .02); e.botNz = lerp(e.botNz, rnd(-1,1)*HUMAN.aimNoise, .02);
+  let tx = e.x, tz = e.z, hop = false;
+  if (h && (h.state === 'aim' || h.state === 'dive')) {
+    if (h.aimAt !== e.botSeenAim) { e.botSeenAim = h.aimAt; e.botReact = rnd(...HUMAN.chickReact); e.botHopAt = null; e.botTries = Math.random() < HUMAN.hopTry; }
+    const since = S.t - h.aimAt, d = len(e.x-h.tx, e.z-h.tz) || .01;
+    if (since > e.botReact && d < 3.2) { tx = e.x + (e.x-h.tx)/d*4; tz = e.z + (e.z-h.tz)/d*4; }
+    if (h.state === 'dive' && e.botHopAt === null && e.botTries && d < 2) e.botHopAt = h.diveAt + rnd(...HUMAN.hopPlan);
+    if (e.botHopAt !== null && S.t >= e.botHopAt) { hop = true; e.botHopAt = Infinity; }
+  } else {
+    const trap = S.ents.find(o => o.kind === 'chick' && o.out && (!h || len(h.x-o.x, h.z-o.z) > HUMAN.rescueBrave));
+    const T = MAP.tunnel, tcx = (T.x0+T.x1)/2, tcz = (T.z0+T.z1)/2;
+    if (trap && e.botRescuer !== false) return { x:trap.x, z:trap.z, hop:false };
+    if (h && e.tunnelCd <= 0 && len(h.x-e.x, h.z-e.z) < 4 && len(tcx-e.x, tcz-e.z) < HUMAN.tunnelSeek) return { x:tcx + e.botNx, z:tcz + e.botNz*3, hop:false };
+    let best = null, bd = 1e9;
+    for (const i of S.items) { const d = len(i.x-e.x, i.z-e.z)*.7; if (d < bd) { bd = d; best = i; } }
+    for (const g of S.eggs) if (g.alive) { const d = len(g.x-e.x, g.z-e.z); if (d < bd) { bd = d; best = g; } }
+    if (best) { tx = best.x; tz = best.z; }
+    if (h) { const d = len(e.x-h.x, e.z-h.z) || .01; if (d < 3.5) { tx += (e.x-h.x)/d*3; tz += (e.z-h.z)/d*3; } }
+  }
+  return { x:clamp(tx + e.botNx, -HW+.8, HW-.8), z:clamp(tz + e.botNz, -HL+.8, HL-.8), hop };
+}
+function botHawk(h){
+  if (h.botNx === undefined) { h.botNx = 0; h.botNz = 0; h.botHopAt = null; }
+  h.botNx = lerp(h.botNx, rnd(-1,1)*HUMAN.aimNoise, .02); h.botNz = lerp(h.botNz, rnd(-1,1)*HUMAN.aimNoise, .02);
+  const prey = S.ents.filter(e => e.kind !== 'hawk' && !e.out && !(e.buff === 'ghost'));
+  if (!h.botTarget || h.botTarget.out || h.botTarget.dead || !prey.includes(h.botTarget) || Math.random() < .004) {
+    const avoid = Math.random() < HUMAN.avoidMuscle;
+    let best = null, bd = 1e9; for (const p of prey) { const d = len(p.x-h.x, p.z-h.z) + (avoid && p.buff === 'muscle' ? 12 : 0); if (d < bd) { bd = d; best = p; } }
+    h.botTarget = best;
+  }
+  const t = h.botTarget; let hop = false;
+  if (!t) return { x:h.x, z:h.z, hop:false };
+  const tx = t.x + t.vx*.35 + h.botNx, tz = t.z + t.vz*.35 + h.botNz;
+  if (h.state === 'fly' && h.cd <= 0 && h.stun <= 0 && len(tx-h.x, tz-h.z) < HUMAN.hawkTrigger && h.botHopAt === null) h.botHopAt = S.t + rnd(...HUMAN.hawkLatency);
+  if (h.botHopAt !== null && S.t >= h.botHopAt) { hop = true; h.botHopAt = null; }
+  return { x:clamp(tx, -HW+.6, HW-.6), z:clamp(tz, -HL+.6, HL-.6), hop };
+}
+function runSim(N, nPlayers){
+  Net.role = 'sim'; Net.myId = 'none';
+  const rounds = [];
+  players.clear();
+  for (let i=0;i<nPlayers;i++) players.set('bot'+i, { pid:'bot'+i, name:'bot'+i, ix:0, iz:0, hop:0, hopSeen:0, last:0 });
+  for (let r=0;r<N;r++) {
+    simLog = { buffs:{}, firstHit:null };
+    startRound(); S.countT = 0;
+    let guard = 0;
+    while ((S.phase === 'count' || S.phase === 'play') && guard++ < 60*200) hostStep(1/60);
+    const hawk = S.res ? S.res.rows.find(r => r[2] === 1) : null;
+    rounds.push({ win:S.res ? S.res.win : 'none', t:S.t, log:simLog, chicks:S.ents.filter(e => e.kind === 'chick').length, alive:S.ents.filter(e => e.kind === 'chick' && !e.out).length });
+  }
+  const n = rounds.length, avg = f => rounds.reduce((a, r) => a + f(r), 0)/n;
+  const hits = avg(r => (r.log.hit||0) + (r.log.out||0)), dives = avg(r => r.log.dive||0);
+  const fh = rounds.filter(r => r.log.firstHit !== null);
+  const res = {
+    rounds:n, players:nPlayers,
+    hawkWin: Math.round(rounds.filter(r => r.win === 'hawk').length/n*100) + '%',
+    avgRoundSec: +avg(r => r.t).toFixed(1),
+    firstHitSec: fh.length ? +(fh.reduce((a,r)=>a+r.log.firstHit,0)/fh.length).toFixed(1) : null,
+    noHitRounds: Math.round((n-fh.length)/n*100) + '%',
+    divesPerRound: +dives.toFixed(1),
+    diveHitRate: Math.round(hits/Math.max(dives,.01)*100) + '%',
+    catchesPerRound: +avg(r => r.log.out||0).toFixed(2),
+    survivorsAtEnd: +avg(r => r.alive).toFixed(2),
+    dodgesPerRound: +avg(r => r.log.dodge||0).toFixed(2),
+    nearPerRound: +avg(r => r.log.near||0).toFixed(2),
+    musclePerRound: +avg(r => r.log.buffs.muscle||0).toFixed(2),
+    punchesPerRound: +avg(r => r.log.punch||0).toFixed(2),
+    buffsPerRound: +avg(r => Object.values(r.log.buffs).reduce((a,b)=>a+b,0)).toFixed(2),
+    fakesPerRound: +avg(r => r.log.fake||0).toFixed(2),
+    eggsPerRound: +avg(r => r.log.egg||0).toFixed(1),
+    bumpsPerRound: +avg(r => r.log.bump||0).toFixed(1),
+    rescuesPerRound: +avg(r => r.log.revive||0).toFixed(2), clangsPerRound: +avg(r => r.log.clang||0).toFixed(2), ejectsPerRound: +avg(r => r.log.eject||0).toFixed(2),
+    jackpotsPerRound: +avg(r => r.log.jackpot||0).toFixed(2), flipsPerRound: +avg(r => r.log.flip||0).toFixed(1), lanesPerRound: +avg(r => r.log.lane||0).toFixed(1), spinsPerRound: +avg(r => r.log.spin||0).toFixed(1),
+    maxTrappedAvg: +avg(r => r.log.maxTrapped||0).toFixed(2),
+    shovesPerRound: +avg(r => r.log.shove||0).toFixed(1),
+  };
+  window.__sim = res; console.log('SIM', JSON.stringify(res));
+  return res;
+}
+if (SIM) {
+  try { const t = JSON.parse(QS.get('tune') || '{}'); if (t.MOTION) Object.assign(MOTION, t.MOTION); if (t.GAME) Object.assign(GAME, t.GAME); if (t.HUMAN) Object.assign(HUMAN, t.HUMAN); } catch {}
+  setTimeout(() => runSim(SIM, clamp(+QS.get('players') || 4, 1, 5)), 50);
+}
 requestAnimationFrame(frame);
 </script>
 </body>
