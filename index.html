@@ -151,7 +151,7 @@ const MOTION = {
   calloutIn:.18, calloutHold:.6, popupRise:70, cardIn:.6, scoreCount:.9,
   muscleScale:1.55, flexEvery:1.1,
 };
-const GAME = { hawkStageBonus:.04, pickTime:15, endShow:4.5, hawkSpawnZ:-4, hawkStartCd:0, hawkScale:.12, timeupHawkFrac:.5, hawkWinFrac:1, eggRespawn:[2.5,4.5], dur:45, hearts:1, minChicks:3, eggPts:10, dodgePts:5, catchPts:30, hitPts:10, punchPts:15, hawkBuffEvery:12, itemEvery:8, maxItems:2, eggs:3, rescuePts:20, targetPts:5, jackpotPts:15 };
+const GAME = { bookEvery:11, bookFirst:9, hawkBookChance:.6, hawkStageBonus:.06, pickTime:15, endShow:4.5, hawkSpawnZ:-4, hawkStartCd:0, hawkScale:.12, timeupHawkFrac:.5, hawkWinFrac:1, eggRespawn:[2.5,4.5], dur:45, hearts:1, minChicks:3, eggPts:10, dodgePts:5, catchPts:30, hitPts:10, punchPts:15, hawkBuffEvery:12, itemEvery:8, maxItems:2, eggs:3, rescuePts:20, targetPts:5, jackpotPts:15 };
 const BUFFS = {
   muscle:{ name:'肌肉男小鸡', dur:6, color:'#ff8a3c', w:.34 },
   speed: { name:'闪电小鸡',   dur:6, color:'#ffd23f', w:.26 },
@@ -159,6 +159,22 @@ const BUFFS = {
   ghost: { name:'隐身',       dur:5, color:'#9be7ff', w:.2 },
 };
 const BUFF_KEYS = Object.keys(BUFFS);
+// 技能书：抽象变身（稀有道具）
+const BOOKS = {
+  rainbow:{ name:'彩虹鸡',     dur:8, color:'#ff8fb3', desc:'无敌 · 碰到蛋壳瞬间救人' },
+  giant:  { name:'超级巨人鸡', dur:7, color:'#ffd23f', desc:'3 倍大 · 一拳打飞老鹰 · 落地震飞全场' },
+  rocket: { name:'火箭鸡',     dur:5, color:'#ff5a3c', desc:'飞上天抓不到 · 落地冲击波' },
+  ball:   { name:'弹力球鸡',   dur:7, color:'#c8d2e6', desc:'变成弹珠，停不下来' },
+};
+const BOOK_KEYS = Object.keys(BOOKS);
+const HBOOKS = {
+  clones: { name:'影分身', dur:7, color:'#b06cff' },
+  bighawk:{ name:'巨鹰',   dur:8, color:'#ff5a3c' },
+  tornado:{ name:'龙卷风', dur:6, color:'#9be7ff' },
+};
+const HBOOK_KEYS = Object.keys(HBOOKS);
+const BFK = ['muscle','speed','ghost', ...BOOK_KEYS];
+const isHawkish = e => e.kind === 'hawk' || e.kind === 'clone';
 const HAWK_BUFFS = { claw:{ name:'巨爪', color:'#ff5a3c' }, quick:{ name:'闪电俯冲', color:'#ffd23f' } };
 const HB_KEYS = Object.keys(HAWK_BUFFS);
 // 逐局成长：每局结束为下一局的角色三选一，同一张卡可以叠加升级
@@ -497,8 +513,9 @@ function buildChick(faceTex){
 }
 function buildHawk(faceTex){
   const root = new THREE.Group(), body = new THREE.Group(); root.add(body);
+  const OUTH = OUT.clone();
   const r = .75, sg = new THREE.SphereGeometry(r, 10, 7);
-  body.add(new THREE.Mesh(sg, toon(0x8e5530))); const o = new THREE.Mesh(sg, OUT); o.scale.setScalar(1.1); body.add(o);
+  body.add(new THREE.Mesh(sg, toon(0x8e5530))); const o = new THREE.Mesh(sg, OUTH); o.scale.setScalar(1.1); body.add(o);
   const cap = new THREE.Mesh(new THREE.SphereGeometry(r*.8, 10, 6, 0, Math.PI*2, 0, Math.PI*.45), toon(0xfff2cf)); cap.position.set(0, r*.3, r*.2); body.add(cap);
   const beak = new THREE.Mesh(new THREE.ConeGeometry(r*.24, r*.6, 4), toon(0xffc23d)); beak.rotation.x = Math.PI/2; beak.position.set(0, -r*.25, r*1.05); body.add(beak);
   const brows = new THREE.Group(); body.add(brows);
@@ -506,7 +523,7 @@ function buildHawk(faceTex){
   const wings = [];
   for (const s of [-1,1]) { const pv = new THREE.Group(); pv.position.set(s*r*.8, r*.1, 0);
     const w = new THREE.Mesh(new THREE.BoxGeometry(r*1.9, r*.14, r*.9), toon(0x5b3420)); w.position.x = s*r*.95;
-    const wo = new THREE.Mesh(w.geometry, OUT); wo.scale.set(1.06, 1.6, 1.15); w.add(wo); pv.add(w); body.add(pv); wings.push(pv); }
+    const wo = new THREE.Mesh(w.geometry, OUTH); wo.scale.set(1.06, 1.6, 1.15); w.add(wo); pv.add(w); body.add(pv); wings.push(pv); }
   const claws = new THREE.Group(); claws.visible = false; body.add(claws);
   for (const s of [-1,1]) { const c = new THREE.Mesh(new THREE.ConeGeometry(r*.22, r*.7, 4), toon(0xff5a3c)); c.position.set(s*r*.35, -r*.95, 0); c.rotation.x = Math.PI; claws.add(c); }
   const faceSpr = new THREE.Sprite(new THREE.SpriteMaterial({ map:faceTex, transparent:true })); faceSpr.scale.set(1.15, 1.15, 1); faceSpr.position.set(0, r*.2, r*.72); faceSpr.renderOrder = 2; faceSpr.visible = false; body.add(faceSpr);
@@ -518,12 +535,15 @@ function buildHawk(faceTex){
   const cross = new THREE.Mesh(new THREE.RingGeometry(.5, .62, 4), new THREE.MeshBasicMaterial({ color:0xfff2cf, transparent:true, opacity:.6, depthWrite:false, side:THREE.DoubleSide }));
   cross.rotation.x = -Math.PI/2; cross.position.y = .05; cross.visible = false;
   scene.add(root, shadow, ret, cross);
-  const mats = []; root.traverse(o => { if (o.material && o.material !== OUT && !mats.includes(o.material)) mats.push(o.material); });
+  const mats = []; root.traverse(o => { if (o.material && !mats.includes(o.material)) mats.push(o.material); });
   return { root, body, wings, shadow, ret, rr, cross, faceSpr, claws, brows, tag:null, mats, fadeA:1 };
 }
 const eggGeo = new THREE.SphereGeometry(.38, 8, 6);
 const eggMeshes = [0,1,2,3,4].map(() => { const m = new THREE.Mesh(eggGeo, toon(0xffe27a, { emissive:0xffb21f, emissiveIntensity:.25 })); const o = new THREE.Mesh(eggGeo, OUT); o.scale.setScalar(1.15); m.add(o); m.visible = false; scene.add(m); return m; });
 const qTex = ctex(16, 16, g => { g.fillStyle = '#ff8a3c'; g.fillRect(0,0,16,16); g.fillStyle = '#ffd23f'; g.fillRect(1,1,14,14); g.fillStyle = '#0b0817'; [[5,3],[6,3],[7,3],[8,3],[9,3],[4,4],[10,4],[10,5],[9,6],[8,7],[7,8],[7,9],[7,12],[7,13],[8,12],[8,13],[8,8],[8,9]].forEach(([x,y]) => g.fillRect(x,y,1,1)); g.fillStyle = '#ff8a3c'; g.fillRect(0,0,16,1); g.fillRect(0,15,16,1); g.fillRect(0,0,1,16); g.fillRect(15,0,1,16); });
+const bookTex = ctex(16, 16, g => { g.fillStyle = '#5a1fa0'; g.fillRect(0,0,16,16); g.fillStyle = '#b06cff'; g.fillRect(1,1,14,14); g.fillStyle = '#ffd23f'; g.fillRect(6,3,4,4); g.fillRect(4,8,8,1); g.fillRect(4,10,8,1); g.fillRect(4,12,6,1); g.fillStyle = '#fff2cf'; g.fillRect(7,4,2,2); });
+const bookMesh = (() => { const g = new THREE.Group(); const m = new THREE.Mesh(new THREE.BoxGeometry(1.1, .3, 1.4), toon(0xffffff, { map:bookTex, emissive:0xb06cff, emissiveIntensity:.4 }));
+  const o = new THREE.Mesh(m.geometry, OUT); o.scale.setScalar(1.1); m.add(o); const pages = new THREE.Mesh(new THREE.BoxGeometry(1, .22, 1.3), toon(0xfff6e0)); pages.position.x = .06; g.add(pages, m); g.visible = false; scene.add(g); return g; })();
 const itemMeshes = [0,1,2].map(() => { const m = new THREE.Mesh(new THREE.BoxGeometry(.9,.9,.9), toon(0xffffff, { map:qTex, emissive:0xff8a3c, emissiveIntensity:.2 })); const o = new THREE.Mesh(m.geometry, OUT); o.scale.setScalar(1.12); m.add(o); m.visible = false; scene.add(m); return m; });
 
 /* ---------------- audio ---------------- */
@@ -824,7 +844,7 @@ function startRound(newSession){
   if (newSession) { S.round = 0; S.aiUp = blankUp(); for (const p of humans) p.up = blankUp(); }
   S.round++; S.stage = S.round;
   const hawkPid = nextHawkPid(S.round), hawkP = hawkPid ? players.get(hawkPid) : null;
-  Object.assign(S, { pick:null, phase:'count', countT:3.4, t:0, endT:0, ents:[], items:[], evq:[], nextId:1, hbT:GAME.hawkBuffEvery, itemT:2.5, res:null, slow:0 });
+  Object.assign(S, { bookT:GAME.bookFirst, pick:null, phase:'count', countT:3.4, t:0, endT:0, ents:[], items:[], evq:[], nextId:1, hbT:GAME.hawkBuffEvery, itemT:2.5, res:null, slow:0 });
   const hawk = mkEnt('hawk', hawkP ? hawkP.pid : null, hawkP ? hawkP.name : '电脑老鹰');
   const nCh = Math.max(GAME.minChicks, humans.length - (hawkP ? 1 : 0));
   hawk.power = 1 + GAME.hawkScale*Math.max(0, nCh - 3) + GAME.hawkStageBonus*(S.stage - 1)*(nCh/3);
@@ -862,7 +882,7 @@ function freeSpot(minD=2.5){
   for (let k=0;k<40;k++) {
     const x = rnd(-HW+1, HW-1), z = rnd(-HL+1, HL-1);
     if (blocked(x, z)) continue;
-    if (S.ents.some(e => e.kind !== 'hawk' && len(e.x-x, e.z-z) < minD)) continue;
+    if (S.ents.some(e => !isHawkish(e) && len(e.x-x, e.z-z) < minD)) continue;
     if (S.items.some(i => len(i.x-x, i.z-z) < 2)) continue;
     if (S.eggs.some(g => g.alive && len(g.x-x, g.z-z) < 1.6)) continue;
     return [x, z];
@@ -905,30 +925,39 @@ function stepChick(e, dt){
     return;
   }
   const muscle = hb(e,'muscle'), speed = hb(e,'speed');
-  let k = e.knock > 0 ? 6 : speed ? 70 : muscle ? 32 : 42, c = e.knock > 0 ? 1.5 : speed ? 11 : 9.5, cap = (speed ? MOTION.chickSpeedBuff : MOTION.chickSpeed)*(muscle ? .85 : 1)*(1 + .1*lv(e,'swift'));
+  const giant = hb(e,'giant'), rainbow = hb(e,'rainbow'), rocket = hb(e,'rocket'), ball = hb(e,'ball');
+  let k = e.knock > 0 ? 6 : speed ? 70 : muscle ? 32 : 42, c = e.knock > 0 ? 1.5 : speed ? 11 : 9.5, cap = (speed ? MOTION.chickSpeedBuff : MOTION.chickSpeed)*(muscle ? .85 : 1)*(1 + .1*lv(e,'swift'))*(giant ? .8 : 1)*(rainbow ? 1.25 : 1)*(rocket ? 1.4 : 1);
+  if (ball) { k = 6; c = 0; cap = 17; }
   if (e.out) { k = 18; c = 6; cap = 9; }
   e.vx += ((tx-e.x)*k - e.vx*c)*dt; e.vz += ((tz-e.z)*k - e.vz*c)*dt;
   const sp = len(e.vx, e.vz); if (sp > cap) { e.vx *= cap/sp; e.vz *= cap/sp; }
+  if (ball) { const s2 = len(e.vx, e.vz) || 1; if (s2 < 14) { e.vx *= 14/s2; e.vz *= 14/s2; if (s2 < .5) { e.vx = 14; } } }
   e.x += e.vx*dt; e.z += e.vz*dt;
   const r = rad(e);
-  if (e.x < -HW+r) { e.x = -HW+r; e.vx = Math.abs(e.vx)*.7; } if (e.x > HW-r) { e.x = HW-r; e.vx = -Math.abs(e.vx)*.7; }
-  if (e.z < -HL+r) { e.z = -HL+r; e.vz = Math.abs(e.vz)*.7; } if (e.z > HL-r) { e.z = HL-r; e.vz = -Math.abs(e.vz)*.7; }
+  const wb = ball ? 1 : .7;
+  if (e.x < -HW+r) { e.x = -HW+r; e.vx = Math.abs(e.vx)*wb; } if (e.x > HW-r) { e.x = HW-r; e.vx = -Math.abs(e.vx)*wb; }
+  if (e.z < -HL+r) { e.z = -HL+r; e.vz = Math.abs(e.vz)*wb; } if (e.z > HL-r) { e.z = HL-r; e.vz = -Math.abs(e.vz)*wb; }
   if (!e.out && e.y < .6) for (const b of BUMPERS) {
     const dx = e.x-b.x, dz = e.z-b.z, d = len(dx,dz), rr = b.r + r;
     if (d < rr && d > 1e-4) {
       const nx = dx/d, nz = dz/d; e.x = b.x + nx*rr; e.z = b.z + nz*rr;
       const vn = e.vx*nx + e.vz*nz; if (vn < 0) { e.vx -= 2*vn*nx; e.vz -= 2*vn*nz; }
       e.vx += nx*MOTION.bumperKick; e.vz += nz*MOTION.bumperKick; e.knock = .28; e.sq = .45;
-      ev('bump', b.x+nx*b.r, b.z+nz*b.r, b.i);
+      ev('bump', b.x+nx*b.r, b.z+nz*b.r, b.i); if (ball) { e.st.score += 3; }
     }
   }
+  if (rocket) { e.air = true; e.vy = (4.8 - e.y)*5; e.wasRocket = true; hop = false; }
+  else if (e.wasRocket && e.y > .3 && !e.air) { e.air = true; e.vy = 0; }
   mapPhysics(e, dt);
   if (hop && !e.out && e.air && e.airHops > 0) { e.airHops--; e.vy = MOTION.hopVelocity*.85*(1 + .12*lv(e,'spring')); e.sq = MOTION.takeoffStretch; ev('hop2', e.x, e.z, 0, e.pid || ''); }
   else if (hop && !e.out && !e.air && e.hopCd <= 0) { e.airHops = lv(e,'double'); e.vy = MOTION.hopVelocity * (muscle ? .85 : 1)*(1 + .12*lv(e,'spring')); e.air = true; e.sq = MOTION.takeoffStretch; e.sqv = 0; ev('hop', e.x, e.z, 0, e.pid || ''); }
   if (e.air) {
     e.vy -= MOTION.gravity*dt*(1 - .08*lv(e,'spring')); e.y += e.vy*dt;
-    if (e.y <= 0) { e.y = 0; e.air = false; e.vy = 0; e.sq = MOTION.landSquash*(muscle ? 1.3 : 1); e.sqv = 0; e.hopCd = .12;
-      if (muscle) { ev('stomp', e.x, e.z); for (const o of S.ents) if (o !== e && o.kind !== 'hawk' && !o.out && len(o.x-e.x, o.z-e.z) < 2.6) { const d = len(o.x-e.x, o.z-e.z) || .1; o.vx += (o.x-e.x)/d*12; o.vz += (o.z-e.z)/d*12; o.knock = .35; } } }
+    if (e.y <= 0) {
+      if (e.wasRocket) { e.wasRocket = false; ev('rocketland', e.x, e.z); for (const o of S.ents) if (o !== e && !isHawkish(o) && !o.out && len(o.x-e.x, o.z-e.z) < 4.5) { const d = len(o.x-e.x, o.z-e.z) || .1; o.vx += (o.x-e.x)/d*15; o.vz += (o.z-e.z)/d*15; o.knock = .5; } }
+      if (giant) { ev('giantstomp', e.x, e.z); for (const o of S.ents) if (o !== e && !o.out && len(o.x-e.x, o.z-e.z) < 7) { const d = len(o.x-e.x, o.z-e.z) || .1; if (isHawkish(o)) { o.stun = Math.max(o.stun, .5); continue; } o.vx += (o.x-e.x)/d*18; o.vz += (o.z-e.z)/d*18; o.knock = .55; } }
+      e.y = 0; e.air = false; e.vy = 0; e.sq = MOTION.landSquash*(muscle ? 1.3 : 1); e.sqv = 0; e.hopCd = .12;
+      if (muscle) { ev('stomp', e.x, e.z); for (const o of S.ents) if (o !== e && !isHawkish(o) && !o.out && len(o.x-e.x, o.z-e.z) < 2.6) { const d = len(o.x-e.x, o.z-e.z) || .1; o.vx += (o.x-e.x)/d*12; o.vz += (o.z-e.z)/d*12; o.knock = .35; } } }
   }
   e.sqv += (-e.sq*MOTION.squashSpring - e.sqv*MOTION.squashDamp)*dt; e.sq += e.sqv*dt;
 }
@@ -982,20 +1011,24 @@ function stepRescue(dt){
     if (e.kind !== 'chick' || !e.out) continue;
     const helper = S.ents.find(o => o.kind === 'chick' && !o.out && len(o.x-e.x, o.z-e.z) < MOTION.rescueRadius);
     const hk = hawkEnt();
-    if (helper) { e.resc = (e.resc || 0) + dt/(MOTION.rescueTime*(1 + .4*lv(hk,'lock'))/(1 + .35*lv(helper,'medic')));
-      if (e.resc >= 1) { e.out = false; e.hearts = 1; e.inv = 2; e.resc = 0; helper.st.rescues = (helper.st.rescues || 0) + 1; helper.st.score += GAME.rescuePts; ev('revive', e.x, e.z, 0, (helper.pid || '') + '|' + helper.name + '|' + (e.pid || '') + '|' + e.name); } }
+    const rb = S.ents.find(o => o.kind === 'chick' && !o.out && hb(o,'rainbow') && len(o.x-e.x, o.z-e.z) < 2.4);
+    if (rb) e.resc = 1;
+    if (helper || rb) { const helper2 = helper || rb; e.resc = (e.resc || 0) + dt/(MOTION.rescueTime*(1 + .4*lv(hk,'lock'))/(1 + .35*lv(helper,'medic')));
+      if (e.resc >= 1) { const helper = helper2; e.out = false; e.hearts = 1; e.inv = 2; e.resc = 0; helper.st.rescues = (helper.st.rescues || 0) + 1; helper.st.score += GAME.rescuePts; ev('revive', e.x, e.z, 0, (helper.pid || '') + '|' + helper.name + '|' + (e.pid || '') + '|' + e.name); } }
     else e.resc = Math.max(0, (e.resc || 0) - dt*.6);
   }
 }
 const hb = (e, k) => !!(e.bf && e.bf[k] > 0);
-const rad = e => e.kind === 'hawk' ? .75 : (hb(e,'muscle') ? .8*MOTION.muscleScale : .8);
+const rad = e => isHawkish(e) ? .75 : hb(e,'giant') ? .8*2.6 : hb(e,'ball') ? .7 : (hb(e,'muscle') ? .8*MOTION.muscleScale : .8);
 function stepHawk(h, dt){
+  if (h.bookT > 0) { h.bookT -= dt; if (h.bookT <= 0) { h.book = ''; h.bookT = 0; } }
+  if (h.book === 'tornado' && S.phase === 'play') for (const e of S.ents) { if (isHawkish(e) || e.out || e.y > 1 || hb(e,'giant')) continue; const dx = h.x - e.x, dz = h.z - e.z, d = len(dx, dz); if (d < 5.5 && d > .3) { const f = 15*(1 - d/5.5)*dt; e.vx += dx/d*f*3 - dz/d*f; e.vz += dz/d*f*3 + dx/d*f; } }
   h.t -= dt; h.cd = Math.max(0, h.cd-dt); h.stun = Math.max(0, h.stun-dt);
   const inp = inputFor(h);
   let tx, tz, hop = false;
   if (inp) { tx = inp.x; tz = inp.z; hop = inp.hop; }
   else {
-    const prey = S.ents.filter(e => e.kind !== 'hawk' && !e.out);
+    const prey = S.ents.filter(e => !isHawkish(e) && !e.out && !(h.kind === 'clone' && e.kind === 'decoy'));
     let t = null, bd = 1e9; for (const p of prey) { const d = len(p.x-h.x, p.z-h.z) + (hb(p,'muscle') ? 8 : 0) + (hb(p,'ghost') ? 5 : 0); if (d < bd) { bd = d; t = p; } }
     if (t) { tx = t.x + t.vx*.3 + Math.sin(S.t*1.7)*.6; tz = t.z + t.vz*.3; h.aiT -= dt; if (h.aiT <= 0 && len(t.x-h.x, t.z-h.z) < 2.2) { hop = true; h.aiT = rnd(.8, 1.8) * (1 - clamp(S.t/GAME.dur,0,1)*.4); } }
     else { tx = Math.cos(S.t*.7)*3; tz = Math.sin(S.t*.7)*4; }
@@ -1005,10 +1038,10 @@ function stepHawk(h, dt){
   if (h.state === 'fly') {
     if (h.stun > 0) { h.vx *= .9; h.vz *= .9; }
     else { h.vx += ((tx-h.x)*16 - h.vx*6.5)*dt; h.vz += ((tz-h.z)*16 - h.vz*6.5)*dt; }
-    const sp = len(h.vx, h.vz), cap = MOTION.hawkFly*(h.power || 1)*(1 + .12*lv(h,'gale')); if (sp > cap) { h.vx *= cap/sp; h.vz *= cap/sp; }
+    const sp = len(h.vx, h.vz), cap = MOTION.hawkFly*(h.power || 1)*(1 + .12*lv(h,'gale'))*(h.book === 'bighawk' ? .85 : 1)*(h.kind === 'clone' ? .9 : 1); if (sp > cap) { h.vx *= cap/sp; h.vz *= cap/sp; }
     h.x += h.vx*dt; h.z += h.vz*dt; h.y = lerp(h.y, MOTION.hawkHeight + Math.sin(S.t*2)*.25, Math.min(1, dt*5));
     if (hop && h.cd <= 0 && h.stun <= 0) {
-      h.state = 'aim'; h.aimDur = h.comboReady ? .25 : (h.hb === 'quick' ? MOTION.hawkAimQuick : MOTION.hawkAim)*Math.max(.4, 1 - .2*lv(h,'eye')); h.comboReady = false; h.t = h.aimDur; h.tx = h.x; h.tz = h.z; h.aimAt = S.t;
+      h.state = 'aim'; h.aimDur = h.kind === 'clone' ? .85 : h.comboReady ? .25 : (h.hb === 'quick' ? MOTION.hawkAimQuick : MOTION.hawkAim)*Math.max(.4, 1 - .2*lv(h,'eye')); h.comboReady = false; h.t = h.aimDur; h.tx = h.x; h.tz = h.z; h.aimAt = S.t;
       for (const e of S.ents) e.react = rnd(...MOTION.aiReact);
       ev('aim', h.x, h.z);
     }
@@ -1029,19 +1062,20 @@ function stepHawk(h, dt){
 }
 function impact(h){
   ev('impact', h.tx, h.tz); h.clanged = false;
-  const claw = h.hb === 'claw', R = MOTION.hitRadius*(claw ? MOTION.clawMul : 1)*(h.power || 1)*(1 + .15*lv(h,'wing'));
+  const claw = h.hb === 'claw', R = MOTION.hitRadius*(claw ? MOTION.clawMul : 1)*(h.power || 1)*(1 + .15*lv(h,'wing'))*(h.book === 'bighawk' ? 2 : 1);
   if (lv(h,'quake') && S.phase === 'play') { const QR = 3 + lv(h,'quake'); ev('quake', h.tx, h.tz, QR);
-    for (const e of S.ents) { if (e.kind === 'hawk' || e.dead) continue; const d = len(e.x-h.tx, e.z-h.tz); if (d < QR && d >= R*.9) { if (e.out) e.resc = 0; else if (e.y < .4) { e.vx += (e.x-h.tx)/(d||1)*9; e.vz += (e.z-h.tz)/(d||1)*9; e.knock = .45; } } } }
+    for (const e of S.ents) { if (isHawkish(e) || e.dead) continue; const d = len(e.x-h.tx, e.z-h.tz); if (d < QR && d >= R*.9) { if (e.out) e.resc = 0; else if (e.y < .4) { e.vx += (e.x-h.tx)/(d||1)*9; e.vz += (e.z-h.tz)/(d||1)*9; e.knock = .45; } } } }
   if (h.hbN > 0) { h.hbN--; if (h.hbN <= 0) h.hb = ''; }
   if (S.phase !== 'play') return;
   let punched = false;
   for (const e of S.ents) {
-    if (e.kind === 'hawk' || e.out || e.dead) continue;
+    if (isHawkish(e) || e.out || e.dead) continue;
     const d = len(e.x-h.tx, e.z-h.tz);
     if (d >= R) { if (e.kind === 'chick' && d < MOTION.nearRadius + (claw ? .8 : 0) && e.inv <= 0) { e.st.score += 3; ev('near', e.x, e.z, 3, e.pid || ''); } continue; }
     if (stageHas('tunnel') && inTunnel(e) && (e.tunnelCd || 0) <= 0) { if (!h.clanged) { h.clanged = true; h.stun = Math.max(h.stun, .35); ev('clang', e.x, e.z); } continue; }
     if (e.kind === 'decoy') { e.dead = true; h.stun = Math.max(h.stun, MOTION.fakeStun); ev('fake', e.x, e.z, 0, h.pid || ''); continue; }
-    if (hb(e,'muscle')) {
+    if (hb(e,'rainbow')) { ev('rainbowblock', e.x, e.z, 0, e.pid || ''); e.st.dodges++; continue; }
+    if (hb(e,'muscle') || hb(e,'giant')) {
       punched = true; e.st.punches++; e.st.score += GAME.punchPts;
       const dd = d || .1; h.vx = (h.tx-e.x)/dd*14 || 10; h.vz = (h.tz-e.z)/dd*14; h.stun = MOTION.punchStun;
       S.slow = MOTION.hitSlowmo; ev('punch', e.x, e.z, 0, (e.pid || '') + '|' + e.name);
@@ -1051,8 +1085,9 @@ function impact(h){
     if (e.inv > 0) continue;
     if (e.shellN > 0) { e.shellN--; e.inv = 1.2; e.knock = .4; const dd0 = d || .1; e.vx = (e.x-h.tx)/dd0*10; e.vz = (e.z-h.tz)/dd0*10; ev('armor', e.x, e.z, e.shellN, e.pid || ''); continue; }
     e.hearts--; e.inv = 1.4; e.knock = .45; const dd = d || .1; e.vx = (e.x-h.tx)/dd*12; e.vz = (e.z-h.tz)/dd*12; e.sq = .7;
-    h.st.hits++; h.st.score += GAME.hitPts; S.slow = MOTION.hitSlowmo;
-    if (e.hearts <= 0) { e.out = true; e.resc = 0; e.vx *= .3; e.vz *= .3; e.bf = {}; h.st.catches++; h.st.score += GAME.catchPts; ev('out', e.x, e.z, 0, (e.pid || '') + '|' + e.name); }
+    const own = (h.kind === 'clone' && hawkEnt()) || h;
+    own.st.hits++; own.st.score += GAME.hitPts; S.slow = MOTION.hitSlowmo;
+    if (e.hearts <= 0) { e.out = true; e.resc = 0; e.vx *= .3; e.vz *= .3; e.bf = {}; own.st.catches++; own.st.score += GAME.catchPts; ev('out', e.x, e.z, 0, (e.pid || '') + '|' + e.name); }
     else ev('hit', e.x, e.z, e.hearts, (e.pid || '') + '|' + e.name);
   }
   if (punched) { h.state = 'rise'; h.t = MOTION.hawkRise*1.4; }
@@ -1060,11 +1095,11 @@ function impact(h){
     if (outN >= Math.max(1, Math.ceil(ch.length*GAME.hawkWinFrac))) endRound('hawk'); }
 }
 function collideChicks(){
-  const list = S.ents.filter(e => e.kind !== 'hawk' && !e.out && !e.dead && e.y < .8);
+  const list = S.ents.filter(e => !isHawkish(e) && !e.out && !e.dead && (e.y < .8 || hb(e,'giant')));
   for (let i=0;i<list.length;i++) for (let j=i+1;j<list.length;j++) {
     const a = list[i], b = list[j], dx = a.x-b.x, dz = a.z-b.z, d = len(dx,dz), rr = rad(a)+rad(b);
     if (d >= rr || d < 1e-4) continue;
-    const nx = dx/d, nz = dz/d, ma = hb(a,'muscle') ? 5 : 1, mb = hb(b,'muscle') ? 5 : 1, over = rr-d;
+    const nx = dx/d, nz = dz/d, ma = hb(a,'giant') ? 25 : hb(a,'muscle') ? 5 : 1, mb = hb(b,'giant') ? 25 : hb(b,'muscle') ? 5 : 1, over = rr-d;
     a.x += nx*over*mb/(ma+mb); a.z += nz*over*mb/(ma+mb); b.x -= nx*over*ma/(ma+mb); b.z -= nz*over*ma/(ma+mb);
     const vn = (a.vx-b.vx)*nx + (a.vz-b.vz)*nz;
     if (vn < 0) { const j2 = -1.9*vn/(1/ma+1/mb); a.vx += j2/ma*nx; a.vz += j2/ma*nz; b.vx -= j2/mb*nx; b.vz -= j2/mb*nz; }
@@ -1079,13 +1114,18 @@ function stepPickups(dt){
     if (e) { g.alive = false; g.t = rnd(...GAME.eggRespawn); e.st.eggs++; e.combo = S.t - (e.lastEgg ?? -9) < 2.5 ? Math.min(4, (e.combo || 1)+1) : 1; e.lastEgg = S.t;
       const pts = GAME.eggPts*e.combo; e.st.score += pts; ev('egg', g.x, g.z, pts, (e.pid || '') + '|' + e.combo); e.sq = .3; }
   }
+  S.bookT -= dt;
+  if (S.bookT <= 0 && !S.items.some(i => i.book)) { const [x, z] = freeSpot(4); S.items.push({ id:S.nextId++, x, z, born:S.t, book:true }); S.bookT = GAME.bookEvery; ev('bookspawn', x, z); }
   S.itemT -= dt;
-  if (S.itemT <= 0 && S.items.length < GAME.maxItems) { const [x, z] = freeSpot(3); S.items.push({ id:S.nextId++, x, z, born:S.t }); S.itemT = GAME.itemEvery; }
+  if (S.itemT <= 0 && S.items.filter(i => !i.book).length < GAME.maxItems) { const [x, z] = freeSpot(3); S.items.push({ id:S.nextId++, x, z, born:S.t }); S.itemT = GAME.itemEvery; }
   for (let i=S.items.length-1;i>=0;i--) {
     const it = S.items[i];
     const e = S.ents.find(e => e.kind === 'chick' && !e.out && e.y < 1.3 && len(e.x-it.x, e.z-it.z) < 1.15 + .9*lv(e,'magnet'));
     if (!e) continue;
-    S.items.splice(i, 1); S.itemT = Math.max(S.itemT, 2);
+    S.items.splice(i, 1);
+    if (it.book) { const k = BOOK_KEYS[Math.floor(Math.random()*BOOK_KEYS.length)]; e.bf[k] = BOOKS[k].dur*(1 + .25*lv(e,'lucky')); if (k === 'ball') { const a = Math.random()*6.28; e.vx = Math.cos(a)*15; e.vz = Math.sin(a)*15; }
+      ev('book', it.x, it.z, BOOK_KEYS.indexOf(k), (e.pid || '') + '|' + e.name); continue; }
+    S.itemT = Math.max(S.itemT, 2);
     const wsum = BUFF_KEYS.reduce((a,k) => a + BUFFS[k].w*(k === 'muscle' ? 1 + .6*lv(e,'lucky') : 1), 0);
     let r = Math.random()*wsum, type = BUFF_KEYS[0]; for (const k of BUFF_KEYS) { const w = BUFFS[k].w*(k === 'muscle' ? 1 + .6*lv(e,'lucky') : 1); if (r < w) { type = k; break; } r -= w; }
     if (type === 'decoy') {
@@ -1099,7 +1139,7 @@ function hostStep(dt){
   if (S.phase === 'count') {
     S.countT -= dt;
     stepMap(dt);
-    for (const e of S.ents) if (e.kind === 'hawk') stepHawk(e, dt); else stepChick(e, dt);
+    for (const e of S.ents) if (isHawkish(e)) stepHawk(e, dt); else stepChick(e, dt);
     if (S.countT <= -.3) S.phase = 'play';
     return;
   }
@@ -1108,11 +1148,17 @@ function hostStep(dt){
     S.t += dt;
     S.hbT -= dt;
     const h = hawkEnt();
-    if (S.hbT <= 0 && h) { S.hbT = GAME.hawkBuffEvery; h.hb = HB_KEYS[Math.floor(Math.random()*HB_KEYS.length)]; h.hbN = 2; ev('hbuff', h.x, h.z, HB_KEYS.indexOf(h.hb), h.pid || ''); }
+    if (S.hbT <= 0 && h) { S.hbT = GAME.hawkBuffEvery;
+      if (Math.random() < Math.min(GAME.hawkBookChance, .3 + .1*S.stage)) {
+        const k = HBOOK_KEYS[Math.floor(Math.random()*HBOOK_KEYS.length)]; h.book = k; h.bookT = HBOOKS[k].dur;
+        if (k === 'clones') for (let c=0;c<3;c++) { const cl = mkEnt('clone', null, '影分身'); const a = c*2.1; cl.x = h.x + Math.cos(a)*2; cl.z = h.z + Math.sin(a)*2; cl.y = h.y; cl.cd = .3 + c*.5; cl.aiT = .2 + c*.4; cl.life = HBOOKS.clones.dur; cl.up = h.up; S.ents.push(cl); }
+        ev('hbook', h.x, h.z, HBOOK_KEYS.indexOf(k), h.pid || '');
+      } else { h.hb = HB_KEYS[Math.floor(Math.random()*HB_KEYS.length)]; h.hbN = 2; ev('hbuff', h.x, h.z, HB_KEYS.indexOf(h.hb), h.pid || ''); } }
     stepPickups(dt); stepRescue(dt);
   } else S.endT += dt;
   stepMap(dt);
-  for (const e of S.ents) if (e.kind === 'hawk') stepHawk(e, dt); else stepChick(e, dt);
+  for (const e of S.ents) if (isHawkish(e)) stepHawk(e, dt); else stepChick(e, dt);
+  for (const e of S.ents) if (e.kind === 'clone') { e.life -= dt; if (e.life <= 0 && e.state !== 'dive' && e.state !== 'aim') { e.dead = true; ev('clonepoof', e.x, e.z); } }
   collideChicks();
   S.ents = S.ents.filter(e => !e.dead);
   if (S.phase === 'play' && S.t >= GAME.dur) { const ch = S.ents.filter(e => e.kind === 'chick'), outN = ch.filter(e => e.out).length;
@@ -1123,7 +1169,7 @@ function endRound(win){
   S.phase = 'end'; S.endT = 0;
   const rows = [];
   for (const e of S.ents) {
-    if (e.kind === 'decoy') continue;
+    if (e.kind === 'decoy' || e.kind === 'clone') continue;
     let line, score = Math.round(e.st.score);
     if (e.kind === 'hawk') line = `抓到 ${e.st.catches} · 啄中 ${e.st.hits}`;
     else { score += Math.round(e.st.alive)*(e.out ? 1 : 2); line = `${e.out ? '被关' : '自由'} · 救人 ${e.st.rescues || 0} · 金蛋 ${e.st.eggs}${e.st.dodges ? ` · 闪避 ${e.st.dodges}` : ''}${e.st.punches ? ` · 打飞 ${e.st.punches}` : ''}`; }
@@ -1159,15 +1205,15 @@ function stepPick(dt){
     startRound(false);
   }
 }
-const KIND = { chick:0, hawk:1, decoy:2 }, HST = { fly:0, aim:1, dive:2, rise:3 };
+const KIND = { chick:0, hawk:1, decoy:2, clone:3 }, HST = { fly:0, aim:1, dive:2, rise:3 };
 function buildSnap(){
   return { t:'snap', ph:S.phase, tm:r2(Math.max(0, GAME.dur - S.t)), ct:r2(S.countT), rd:S.round, et:r2(S.endT),
     e:S.ents.map(e => [e.id, KIND[e.kind], e.pid || '', e.name, r2(e.x), r2(e.z), r2(e.y),
       (e.out?1:0)|(e.air?2:0)|(e.inv>0?4:0)|(e.stun>0?8:0)|(e.hb==='claw'?16:0)|(e.hb==='quick'?32:0),
-      e.hearts, ['muscle','speed','ghost'].reduce((m,k,i) => m | (hb(e,k) ? 1<<i : 0), 0), ['muscle','speed','ghost'].map(k => r2(e.bf[k] || 0)), HST[e.state] || 0, r2(e.tx), r2(e.tz),
-      e.state === 'aim' ? r2(1 - e.t/e.aimDur) : 0, r2(e.sq), r2(e.vx), r2(e.vz), r2(e.cd), e.faceKey || (e.pid ? '' : 'ai' + e.id), Math.round(e.st.score), r2(e.resc || 0), inTunnel(e) ? 1 : 0]),
+      e.hearts, BFK.reduce((m,k,i) => m | (hb(e,k) ? 1<<i : 0), 0), BFK.map(k => r2(e.bf[k] || 0)), HST[e.state] || 0, r2(e.tx), r2(e.tz),
+      e.state === 'aim' ? r2(1 - e.t/e.aimDur) : 0, r2(e.sq), r2(e.vx), r2(e.vz), r2(e.cd), e.faceKey || (e.pid ? '' : 'ai' + e.id), Math.round(e.st.score), r2(e.resc || 0), inTunnel(e) ? 1 : 0, e.book ? HBOOK_KEYS.indexOf(e.book)+1 : 0, r2(e.bookT || 0)]),
     mp:S.map ? [...S.map.spin.map(r2), ...S.map.flip.map(r2), S.map.tg.reduce((a,b,i) => a | (b << i), 0)] : null,
-    it:S.items.map(i => [i.id, r2(i.x), r2(i.z)]),
+    it:S.items.map(i => [i.id, r2(i.x), r2(i.z), i.book ? 1 : 0]),
     eg:S.eggs.filter(g => g.alive).map(g => [r2(g.x), r2(g.z)]),
     ev:S.evq.slice(-16), res:S.res, sg:S.stage || 1,
     pk:S.pick ? { t:r2(S.pick.t), st:S.pick.stage, o:Object.fromEntries(Object.entries(S.pick.offers).map(([pid, o]) => [pid, [o.role, o.cards, o.chosen || '']])) } : null,
@@ -1190,7 +1236,7 @@ function applySnap(sn, local){
   W.sg = +sn.sg || 1; W.pk = sn.pk && typeof sn.pk === 'object' ? sn.pk : null; W.up = sn.up && typeof sn.up === 'object' ? sn.up : {};
   const seen = new Set();
   W.ents = (Array.isArray(sn.e) ? sn.e : []).map(a => {
-    const [id, k, pid, name, x, z, y, fl, hearts, bf, bt, st, tx, tz, ap, sq, vx, vz, cd, fk, score, resc, tun] = a;
+    const [id, k, pid, name, x, z, y, fl, hearts, bf, bt, st, tx, tz, ap, sq, vx, vz, cd, fk, score, resc, tun, bk, bkt] = a;
     seen.add(id);
     let v = views.get(id);
     if (!v || roundChanged && !local) {
@@ -1199,7 +1245,7 @@ function applySnap(sn, local){
       v.dx = +x; v.dz = +z; v.dy = +y; views.set(id, v);
     }
     Object.assign(v, { x:+x, z:+z, y:+y, out:!!(fl&1), air:!!(fl&2), inv:!!(fl&4), stun:!!(fl&8), claw:!!(fl&16), quick:!!(fl&32),
-      hearts:+hearts, bf:Array.isArray(bt) ? { muscle:+bt[0] || 0, speed:+bt[1] || 0, ghost:+bt[2] || 0 } : {}, state:['fly','aim','dive','rise'][st] || 'fly', tx:+tx, tz:+tz, aimP:+ap, sq:+sq, vx:+vx, vz:+vz, cd:+cd, score:+score, resc:+resc || 0, tun:!!tun, name:String(name).slice(0,12) });
+      hearts:+hearts, bf:Array.isArray(bt) ? Object.fromEntries(BFK.map((k, i) => [k, +bt[i] || 0])) : {}, state:['fly','aim','dive','rise'][st] || 'fly', tx:+tx, tz:+tz, aimP:+ap, sq:+sq, vx:+vx, vz:+vz, cd:+cd, score:+score, resc:+resc || 0, tun:!!tun, book:bk ? HBOOK_KEYS[bk-1] : '', bookT:+bkt || 0, name:String(name).slice(0,12) });
     if (local) { v.dx = v.x; v.dz = v.z; v.dy = v.y; }
     return v;
   });
@@ -1216,7 +1262,8 @@ function makeView(id, k, pid, name, fk){
   const key = k === 2 ? fk : (pid || fk || ('ai' + id));
   const f = faceFor(key);
   const v = { id, k, pid, name, key, dx:0, dz:0, dy:0, x:0, z:0, y:0, flex:0 };
-  if (k === 1) { v.mesh = buildHawk(f.tex); }
+  if (k === 1 || k === 3) { v.mesh = buildHawk(f.tex);
+    if (k === 3) { v.mesh.mats.forEach(m => { if (m.color) m.color.lerp(new THREE.Color(0xb06cff), .7); if (m.emissive) { m.emissive.set(0x5a1fa0); m.emissiveIntensity = .5; } m.transparent = true; m.opacity = .7; }); v.mesh.fadeA = .7; } }
   else { v.mesh = buildChick(f.tex); }
   if (pid && k !== 2) { v.mesh.tag = nameSprite(isMe ? '▼ 你' : name, isMe ? '#ffd23f' : '#fff2cf'); v.mesh.root.add(v.mesh.tag); }
   return v;
@@ -1288,6 +1335,14 @@ function fx(type, x, z, a, s){
     case 'hop2': burst(x, 1.2, z, 10, [0x7fe6ff, 0xfff2cf], 4, .4, 4); wave(x, z, 1.6, 0x7fe6ff); if (mine) SFX.hop(); break;
     case 'armor': burst(x, 1, z, 20, [0xfff6e0, 0x9a8fc4], 6, .5); SFX.shield(); if (mine) callout(a > 0 ? `铁壳挡住了！还剩 ${a} 层` : '铁壳碎了！', '#fff6e0', 44); else popup(x, 2.4, z, '铁壳！', '#fff6e0'); break;
     case 'quake': wave(x, z, a*1.1, 0xff8a3c); burst(x, .2, z, 24, [0xff8a3c, 0x9a8fc4], 8, .6); shake = Math.max(shake, .5); SFX.punch(); break;
+    case 'bookspawn': burst(x, 1.2, z, 20, [0xb06cff, 0xffd23f], 4, .8, -1); SFX.claw(); popup(x, 2.6, z, '技能书！', '#b06cff'); break;
+    case 'book': { const k = BOOK_KEYS[a] || 'rainbow', B = BOOKS[k]; burst(x, 1.4, z, 40, [0xb06cff, 0xffd23f, 0xfff2cf, 0xff8fb3], 7, 1, 6, 1.2); SFX.roulette(); setTimeout(() => (k === 'giant' ? SFX.muscle() : SFX.win()), 250);
+      callout(mine ? `${B.name}！` : `${who} 变成了${B.name}`, B.color, mine ? 64 : 40); if (mine) setTimeout(() => popup(x, 3, z, B.desc, '#fff2cf'), 400); shake = Math.max(shake, .3); break; }
+    case 'hbook': { const k = HBOOK_KEYS[a] || 'clones', B = HBOOKS[k]; SFX.claw(); setTimeout(() => SFX.punch(), 200); burst(x, 6, z, 30, [0xb06cff, 0xff5a3c], 6, .8, 4); callout(mine ? `你读了技能书：${B.name}！` : `老鹰读了技能书：${B.name}！`, B.color, 48); break; }
+    case 'clonepoof': burst(x, 5, z, 18, [0xb06cff, 0x5a1fa0], 5, .6, 2); SFX.poof(); break;
+    case 'rainbowblock': burst(x, 1.4, z, 30, [0xff5a3c, 0xffd23f, 0x53e3b7, 0x7fe6ff, 0xb06cff], 7, .7); SFX.dodge(); popup(x, 2.8, z, '彩虹护体！', '#ff8fb3'); break;
+    case 'giantstomp': wave(x, z, 7.5, 0xffd23f); burst(x, .2, z, 40, [0xffd23f, 0x9a8fc4, 0xfff2cf], 9, .7); shake = Math.max(shake, .9); punch = .6; SFX.punch(); break;
+    case 'rocketland': wave(x, z, 5, 0xff5a3c); burst(x, .2, z, 30, [0xff5a3c, 0xffd23f], 8, .6); shake = Math.max(shake, .6); SFX.impact(); break;
     case 'shove': SFX.shove(); burst(x, .6, z, 6, 0xff8a3c, 4, .3); break;
     case 'win': {
       const meK = me ? me.k : -1, iWon = (a === 1) === (meK === 1);
@@ -1476,15 +1531,16 @@ function drawHUD(rdt){
         ctx.fillStyle = ready ? '#ff5a3c' : '#4a4170'; ctx.fillRect(OW/2-58, 106, 116*(ready ? 1 : clamp(1 - me.cd/MOTION.hawkCd, 0, 1)), 10);
         text(me.stun ? '被打晕了！' : ready ? '张嘴 = 俯冲' : '…', OW/2, 132, 16, me.stun ? '#ff8a3c' : '#fff2cf', 'center', 4);
         if (me.claw || me.quick) text(me.claw ? '巨爪 ×2' : '闪电俯冲 ×2', OW/2, 154, 16, '#ffd23f', 'center', 4);
+        if (me.book) text(`${HBOOKS[me.book].name} ${Math.ceil(me.bookT)}`, OW/2, 176, 18, HBOOKS[me.book].color, 'center', 4);
       } else {
         if (me.out) { text('等队友来救 · 张嘴喊救命', OW/2, 116, 17, '#fff2cf', 'center', 4); ctx.fillStyle = '#0b0817'; ctx.fillRect(OW/2-60, 134, 120, 12); ctx.fillStyle = '#53e3b7'; ctx.fillRect(OW/2-58, 136, 116*me.resc, 8); }
         else { const trapped = W.ents.filter(o => o.k === 0 && o.out).length; if (trapped) text(`${trapped} 只小鸡在蛋壳里，去救！`, OW/2, 112, 17, '#53e3b7', 'center', 4); else if (me.tun) text('隧道里老鹰扑不到你', OW/2, 112, 17, '#b4ff3c', 'center', 4); }
-        if (!me.out) { const act = ['muscle','speed','ghost'].filter(k => hb(me,k)); if (act.length) { const nm = act.length > 1 ? act.map(k => BUFFS[k].name.replace('小鸡','')).join('+') + '小鸡' : BUFFS[act[0]].name;
-          text(`${nm} ${Math.ceil(Math.max(...act.map(k => me.bf[k])))}`, OW/2, 142, 18, BUFFS[act[0]].color, 'center', 4); } }
+        if (!me.out) { const act = BFK.filter(k => hb(me,k)), D = k => BUFFS[k] || BOOKS[k]; if (act.length) { const nm = act.length > 1 ? act.map(k => D(k).name.replace('小鸡','').replace('鸡','')).join('+') + '鸡' : D(act[0]).name;
+          text(`${nm} ${Math.ceil(Math.max(...act.map(k => me.bf[k])))}`, OW/2, 142, 18, D(act[0]).color, 'center', 4); } }
       }
     }
     // scoreboard (right)
-    const list = W.ents.filter(v => v.k !== 2);
+    const list = W.ents.filter(v => v.k !== 2 && v.k !== 3);
     list.forEach((v, i) => {
       const y = 16 + i*38, x = OW-150;
       ctx.fillStyle = 'rgba(11,8,23,.75)'; ctx.fillRect(x, y, 136, 32);
@@ -1529,7 +1585,7 @@ function drawHUD(rdt){
 function drawArrows(me){
   // 画面外的对手：沿屏幕边缘画箭头 + 头像
   for (const v of W.ents) {
-    if (v === me || v.k === 2) continue;
+    if (v === me || v.k === 2 || v.k === 3) continue;
     if (v.out && (me.k === 1 || me.out)) continue;
     if (hb(v,'ghost')) continue;
     const enemy = (me.k === 1) !== (v.k === 1);
@@ -1636,7 +1692,7 @@ function frame(now){
   // danger cue for me
   const me = meView();
   let aiming = false;
-  if (me && me.k !== 1 && !me.out && (W.phase === 'play')) for (const v of W.ents) if (v.k === 1 && (v.state === 'aim' || v.state === 'dive') && len(v.tx-me.dx, v.tz-me.dz) < 2.4) aiming = true;
+  if (me && me.k !== 1 && !me.out && (W.phase === 'play')) for (const v of W.ents) if ((v.k === 1 || v.k === 3) && (v.state === 'aim' || v.state === 'dive') && len(v.tx-me.dx, v.tz-me.dz) < 2.4) aiming = true;
   danger = lerp(danger, aiming ? .6 + Math.sin(now/90)*.4 : 0, Math.min(1, rdt*10));
   if (aiming && now - lastBeat > 280) { lastBeat = now; SFX.beat(); }
   redFlash = Math.max(0, redFlash - rdt*2.2);
@@ -1673,9 +1729,10 @@ function frame(now){
 function renderWorld(t, rdt){
   for (const v of W.ents) {
     const m = v.mesh, isMe = !!(v.pid && v.pid === Net.myId);
-    if (v.k === 1) {
-      m.root.position.set(v.dx, v.dy, v.dz);
-      { const near = !isMe && camera.position.distanceTo(m.root.position) < 11.5, a = near ? .28 : 1; // 挡镜头时变半透明
+    if (v.k === 1 || v.k === 3) {
+      m.root.position.set(v.dx, v.dy, v.dz); m.root.scale.setScalar(v.book === 'bighawk' ? 2.2 : 1);
+      if (v.book === 'tornado') for (let q=0;q<2;q++) { const a = t*9 + q*3.14 + Math.random(); const rr = 1 + Math.random()*4; burst(v.dx + Math.cos(a)*rr, .3 + Math.random()*3, v.dz + Math.sin(a)*rr, 1, 0x9be7ff, .5, .4, -2, .8); }
+      { const near = !isMe && camera.position.distanceTo(m.root.position) < 11.5, a = near ? .28 : v.k === 3 ? .7 : 1; // 挡镜头时变半透明
         if (Math.abs(m.fadeA - a) > .01) { m.fadeA = a; m.mats.forEach(x => { x.transparent = a < 1; x.opacity = a; x.depthWrite = a >= 1; }); } }
       m.faceSpr.visible = !!(v.pid && faces.get(v.pid)?.real);
       m.brows.visible = !m.faceSpr.visible;
@@ -1697,9 +1754,9 @@ function renderWorld(t, rdt){
       continue;
     }
     // chick / decoy
-    const muscle = hb(v,'muscle'), speed = hb(v,'speed'), ghost = hb(v,'ghost');
+    const muscle = hb(v,'muscle'), speed = hb(v,'speed'), ghost = hb(v,'ghost'), giant = hb(v,'giant'), rainbow = hb(v,'rainbow'), rocket = hb(v,'rocket'), ball = hb(v,'ball');
     m.root.position.set(v.dx, 0, v.dz);
-    const sc = muscle ? MOTION.muscleScale : 1;
+    const sc = giant ? 2.6 : muscle ? MOTION.muscleScale : ball ? .85 : 1;
     const airS = v.air ? clamp(v.vy ?? 0, -1, 1)*0 : 0;
     const s = v.sq + airS;
     m.body.scale.set(sc*(1+s*.35), sc*(1-s*.45), sc*(1+s*.35));
@@ -1712,6 +1769,10 @@ function renderWorld(t, rdt){
       m.muscle.children.forEach(ch => { if (ch.userData && ch.userData.elbow) { ch.rotation.z = ch.userData.s*(-.2 + flex*.5); ch.userData.elbow.rotation.z = ch.userData.s*(flex*1.4); } });
       m.bodyMat.color.set(0xffb347);
     } else m.bodyMat.color.set(0xffd23f);
+    if (rainbow) m.bodyMat.color.setHSL((t*1.5 + v.id*.1) % 1, .85, .6);
+    if (ball) m.bodyMat.color.set(0xc8d2e6);
+    m.bodyMat.emissive.set(rainbow ? 0x442244 : ball ? 0x334055 : 0x000000);
+    if (ball) m.body.rotation.x = t*12;
     const flap = v.air ? .9 + Math.sin(t*30)*.4 : (len(v.vx, v.vz) > 3 ? Math.abs(Math.sin(t*16))*.6 : .08);
     m.wings.forEach((w,i) => { w.rotation.z = (i ? 1 : -1)*flap; w.visible = !muscle; });
     m.shadow.scale.setScalar(Math.max(.4, 1 - v.dy*.12)*sc*(v.out ? 1.3 : 1));
@@ -1725,10 +1786,15 @@ function renderWorld(t, rdt){
     if (Math.abs(m.ghostA - a) > .01) { m.ghostA = a; m.mats.forEach(x => { x.transparent = a < 1; x.opacity = a; x.depthWrite = a >= 1; }); m.faceSpr.material.opacity = a; m.shadow.material.opacity = .35*a; }
     m.root.visible = !blink;
     if (m.tag) { m.tag.visible = !ghost || isMe; m.tag.position.y = 2*sc + 1 + v.dy; }
+    if (rainbow) burst(v.dx - v.vx*.03, .5 + Math.random()*.8, v.dz - v.vz*.03, 2, [0xff5a3c, 0xffd23f, 0x53e3b7, 0x7fe6ff, 0xb06cff], .4, .7, 0, 1.1);
+    if (rocket) { burst(v.dx, v.dy, v.dz, 3, [0xff5a3c, 0xffd23f, 0xfff2cf], 2, .35, -8, 1); }
+    if (giant && Math.random() < .05) shake = Math.max(shake, .08);
     if (speed && len(v.vx, v.vz) > 5 && Math.random() < .6) burst(v.dx - v.vx*.04, .4, v.dz - v.vz*.04, 1, 0xffd23f, .6, .3, 0, .9);
   }
   // items & eggs
-  itemMeshes.forEach((m, i) => { const it = W.items[i]; m.visible = !!it; if (it) { m.position.set(it[1], .8 + Math.sin(t*3+i)*.15, it[2]); m.rotation.set(.3, t*2, 0); } });
+  const bk = W.items.find(i => i[3]); bookMesh.visible = !!bk; if (bk) { bookMesh.position.set(bk[1], 1.2 + Math.sin(t*2.5)*.25, bk[2]); bookMesh.rotation.set(Math.sin(t*1.7)*.3, t*1.6, .25); if (Math.random() < .3) burst(bk[1], 1.2, bk[2], 1, [0xb06cff, 0xffd23f], 1.5, .6, -2, .8); }
+  const boxes = W.items.filter(i => !i[3]);
+  itemMeshes.forEach((m, i) => { const it = boxes[i]; m.visible = !!it; if (it) { m.position.set(it[1], .8 + Math.sin(t*3+i)*.15, it[2]); m.rotation.set(.3, t*2, 0); } });
   eggMeshes.forEach((m, i) => { const g = W.eggs[i]; m.visible = !!g; if (g) { m.position.set(g[0], .55 + Math.sin(t*3+i)*.12, g[1]); m.scale.set(1, 1.3, 1); m.rotation.y = t*1.5; } });
   bumperMeshes.forEach((m,i) => { const f = BUMPERS[i].flash; m.cap.scale.set(1+f*.25, 1+f*.6, 1+f*.25); m.capMat.emissiveIntensity = f; });
   const mp = W.mp, nS = MAP.spinners.length, nF = MAP.flippers.length;
@@ -1763,7 +1829,8 @@ function simLogEv(type, a){
   if (type === 'out') L.maxTrapped = Math.max(L.maxTrapped || 0, S.ents.filter(e => e.kind === 'chick' && e.out).length);
 }
 function botChick(e){
-  const h = hawkEnt();
+  let h = hawkEnt();
+  { let bd = 1e9; for (const x of S.ents) if (isHawkish(x) && (x.state === 'aim' || x.state === 'dive')) { const d = len(x.tx-e.x, x.tz-e.z); if (d < bd) { bd = d; h = x; } } }
   if (e.botN === undefined) { e.botN = rnd(0, 10); e.botNx = 0; e.botNz = 0; }
   e.botN += 1/60;
   // 人脸操作的位置误差：缓慢漂移的噪声
@@ -1781,7 +1848,7 @@ function botChick(e){
     if (trap && e.botRescuer !== false) return { x:trap.x, z:trap.z, hop:false };
     if (h && e.tunnelCd <= 0 && len(h.x-e.x, h.z-e.z) < 4 && len(tcx-e.x, tcz-e.z) < HUMAN.tunnelSeek) return { x:tcx + e.botNx, z:tcz + e.botNz*3, hop:false };
     let best = null, bd = 1e9;
-    for (const i of S.items) { const d = len(i.x-e.x, i.z-e.z)*.7; if (d < bd) { bd = d; best = i; } }
+    for (const i of S.items) { const d = len(i.x-e.x, i.z-e.z)*(i.book ? .45 : .7); if (d < bd) { bd = d; best = i; } }
     for (const g of S.eggs) if (g.alive) { const d = len(g.x-e.x, g.z-e.z); if (d < bd) { bd = d; best = g; } }
     if (best) { tx = best.x; tz = best.z; }
     if (h) { const d = len(e.x-h.x, e.z-h.z) || .01; if (d < 3.5) { tx += (e.x-h.x)/d*3; tz += (e.z-h.z)/d*3; } }
@@ -1791,7 +1858,7 @@ function botChick(e){
 function botHawk(h){
   if (h.botNx === undefined) { h.botNx = 0; h.botNz = 0; h.botHopAt = null; }
   h.botNx = lerp(h.botNx, rnd(-1,1)*HUMAN.aimNoise, .02); h.botNz = lerp(h.botNz, rnd(-1,1)*HUMAN.aimNoise, .02);
-  const prey = S.ents.filter(e => e.kind !== 'hawk' && !e.out && !hb(e,'ghost'));
+  const prey = S.ents.filter(e => !isHawkish(e) && e.kind !== 'decoy' && !e.out && !hb(e,'ghost'));
   if (!h.botTarget || h.botTarget.out || h.botTarget.dead || !prey.includes(h.botTarget) || Math.random() < .004) {
     const avoid = Math.random() < HUMAN.avoidMuscle;
     let best = null, bd = 1e9; for (const p of prey) { const d = len(p.x-h.x, p.z-h.z) + (avoid && hb(p,'muscle') ? 12 : 0); if (d < bd) { bd = d; best = p; } }
@@ -1827,6 +1894,7 @@ function runSim(N, nPlayers){
   const res = {
     rounds:n, players:nPlayers,
     hawkWin: Math.round(rounds.filter(r => r.win === 'hawk').length/n*100) + '%',
+    booksPerRound: +avg(r => r.log.book||0).toFixed(2), hbooksPerRound: +avg(r => r.log.hbook||0).toFixed(2), rbBlocks: +avg(r => r.log.rainbowblock||0).toFixed(2), giantStomps: +avg(r => r.log.giantstomp||0).toFixed(2),
     hawkWinByStage: Object.entries(byStage).map(([k, a]) => `S${k}:${Math.round(a.reduce((x,y)=>x+y,0)/a.length*100)}%`).join(' '),
     avgRoundSec: +avg(r => r.t).toFixed(1),
     firstHitSec: fh.length ? +(fh.reduce((a,r)=>a+r.log.firstHit,0)/fh.length).toFixed(1) : null,
